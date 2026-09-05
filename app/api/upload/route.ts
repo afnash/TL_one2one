@@ -1,18 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "No file uploaded" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size exceeds 50 MB limit" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "File size exceeds 50 MB limit" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const bytes = await file.arrayBuffer();
@@ -30,17 +35,26 @@ export async function POST(req: NextRequest) {
 
     const publicUrl = `/uploads/${uniqueFileName}`;
 
-    return NextResponse.json({
-      url: publicUrl,
-      fileName: file.name,
-      sizeBytes: file.size,
-      mimeType: file.type,
-    });
+    return new Response(
+      JSON.stringify({
+        url: publicUrl,
+        fileName: file.name,
+        sizeBytes: file.size,
+        mimeType: file.type,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error: any) {
     console.error("Upload handler error:", error);
-    return NextResponse.json(
-      { error: error?.message || "Internal server error during upload" },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: error?.message || "Internal server error during upload" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 }
