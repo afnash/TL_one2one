@@ -1,10 +1,12 @@
 "use client";
 
+import { BoardAccess } from "@/components/session/BoardAccess";
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
+import { LiveVideoTile } from "@/components/session/LiveVideoTile";
 import { formatTime } from "@/lib/utils";
 import {
   Mic,
@@ -17,13 +19,18 @@ import {
   Sparkles,
   Users,
   Settings,
-  Maximize2,
-  CheckCircle2,
+  BookOpen,
+  GraduationCap,
   Clock,
   Circle,
-  MessageSquare,
   ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  XCircle,
   ChevronDown,
+  Minimize2,
+  Maximize2,
+  Move,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,57 +44,72 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
   const router = useRouter();
 
   const {
+    user,
     sessions,
     students,
     whiteboards,
+    assignments,
+    submissions,
     activeSession,
     sessionElapsedSeconds,
     startLiveSession,
     endLiveSession,
     updateWhiteboardElements,
+    gradeSubmission,
   } = useLMS();
 
-  // Find or initialize session
-  const currentSession =
-    sessions.find((s) => s.id === sessionId) ||
-    activeSession || {
-      id: sessionId,
-      teacherId: "t1",
-      teacherName: "Alex Thomas",
-      teacherAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      studentId: "s1",
-      studentName: "Rahul Menon",
-      studentAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-      subject: "Mathematics",
-      topic: "Quadratic Equations — Roots & Factorisation",
-      date: new Date().toISOString().split("T")[0],
-      scheduledTime: "04:00 PM",
-      durationMinutes: 60,
-      status: "LIVE" as const,
-      whiteboardId: "wb-live-math-rahul",
-    };
+  // Find current session
+  const currentSession = sessions.find((s) => s.id === sessionId) || activeSession;
 
-  // State for live session media controls
+  // Live session media controls
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isStudentBoardsDrawerOpen, setIsStudentBoardsDrawerOpen] = useState(false);
 
-  // Selected student & whiteboard inside the classroom
-  const [selectedStudentId, setSelectedStudentId] = useState(currentSession.studentId || "s1");
+  // Video Panel Minimize / Pop-up State
+  const [isVideoPanelMinimized, setIsVideoPanelMinimized] = useState(false);
+  const [pipPosition, setPipPosition] = useState<"bottom-right" | "top-right" | "bottom-left">("bottom-right");
+
+  // In-Session Workspace Mode: "LIVE_BOARD" | "ASSIGNMENT_VIEW" | "STUDENT_SCRATCHPAD"
+  const [workspaceMode, setWorkspaceMode] = useState<"LIVE_BOARD" | "ASSIGNMENT_VIEW" | "STUDENT_SCRATCHPAD">("LIVE_BOARD");
+
+  // Selected student and boards
+  const [selectedStudentId, setSelectedStudentId] = useState(currentSession?.studentId || "");
   const [activeWhiteboardId, setActiveWhiteboardId] = useState(
-    currentSession.whiteboardId || "wb-live-math-rahul"
+    currentSession?.whiteboardId || ""
   );
 
-  // Auto-start timer if not already running
+  // Assignment & live grading inside class
+  const activeAssignment = assignments[0];
+  const studentSubmission = submissions.find(
+    (s) => s.studentId === selectedStudentId && s.assignmentId === activeAssignment?.id
+  );
+
+  const [liveGradeScore, setLiveGradeScore] = useState<number>(studentSubmission?.score || 0);
+  const [liveFeedback, setLiveFeedback] = useState<string>(studentSubmission?.teacherFeedback || "");
+
+  // Auto-start timer
   useEffect(() => {
-    if (!activeSession) {
+    if (currentSession && currentSession.status === "LIVE" && !activeSession) {
       startLiveSession(sessionId);
     }
-  }, [sessionId, activeSession, startLiveSession]);
+  }, [sessionId, currentSession, activeSession, startLiveSession]);
+
+  // Determine current active whiteboard based on mode
+  useEffect(() => {
+    if (workspaceMode === "LIVE_BOARD") {
+      setActiveWhiteboardId(currentSession?.whiteboardId || "");
+    } else if (workspaceMode === "ASSIGNMENT_VIEW") {
+      setActiveWhiteboardId(studentSubmission?.whiteboardId || "");
+    } else {
+      setActiveWhiteboardId(
+        whiteboards.find((board) => board.studentId === selectedStudentId && board.category === "PRACTICE")?.id || ""
+      );
+    }
+  }, [workspaceMode, currentSession?.whiteboardId, studentSubmission?.whiteboardId, whiteboards, selectedStudentId]);
 
   const currentWhiteboard =
-    whiteboards.find((w) => w.id === activeWhiteboardId) || whiteboards[0];
+    whiteboards.find((w) => w.id === activeWhiteboardId);
 
   const studentObj =
     students.find((s) => s.id === selectedStudentId) || students[0];
@@ -99,198 +121,224 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
         "Are you sure you want to end this live session and proceed to the Session Report?"
       )
     ) {
-      const summary = endLiveSession(sessionId);
+      endLiveSession(sessionId);
       router.push(`/teacher/session/${sessionId}/report`);
     }
   };
 
+  const handleSaveLiveGrade = () => {
+    if (studentSubmission) {
+      gradeSubmission(studentSubmission.id, liveGradeScore, liveFeedback);
+      alert("Assignment marks & feedback updated successfully during live class!");
+    }
+  };
+
+  if (!currentSession || !studentObj) {
+    return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-300">Session not found.</div>;
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
-      {/* 1-to-1 Live Classroom Header */}
-      <header className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-        {/* Left: Student info & topic */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold text-slate-200">1:1 LIVE CLASS</span>
+      {/* 1-to-1 Live Classroom Header (Airy Glassmorphism) */}
+      <header className="h-16 px-5 glass-dark flex items-center justify-between shrink-0 z-30">
+        {/* Left: 1-on-1 Status & Student Details */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-xs font-extrabold tracking-wide uppercase">1:1 Live</span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="text-sm font-bold text-white">
+          <div className="hidden sm:flex items-center gap-2.5">
+            <span className="text-sm font-bold text-white tracking-tight">
               {studentObj.name}
             </span>
-            <span className="text-xs text-slate-400">•</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            <span className="text-slate-600">•</span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
               {currentSession.subject}
             </span>
-            <span className="text-xs text-slate-400 hidden md:inline truncate max-w-xs">
+            <span className="text-xs text-slate-400 hidden lg:inline max-w-sm truncate">
               {currentSession.topic}
             </span>
           </div>
         </div>
 
-        {/* Center: Live Timer & Recording Indicator */}
-        <div className="flex items-center gap-3 bg-slate-800/80 px-3.5 py-1 rounded-xl border border-slate-700">
-          <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold">
-            <Circle className="w-2.5 h-2.5 fill-rose-500 animate-ping" />
-            <span>REC</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-slate-700" />
-          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400">
+        {/* Center: In-Class Screen / Board Mode Switcher */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 border border-white/10 rounded-2xl shadow-inner">
+          <button
+            onClick={() => setWorkspaceMode("LIVE_BOARD")}
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all",
+              workspaceMode === "LIVE_BOARD"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            )}
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Live Class Board</span>
+          </button>
+
+          <button
+            onClick={() => setWorkspaceMode("ASSIGNMENT_VIEW")}
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all",
+              workspaceMode === "ASSIGNMENT_VIEW"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            )}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Assignment & Homework</span>
+          </button>
+
+          <button
+            onClick={() => setWorkspaceMode("STUDENT_SCRATCHPAD")}
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all",
+              workspaceMode === "STUDENT_SCRATCHPAD"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            )}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Student Scratchpad</span>
+          </button>
+        </div>
+
+        {/* Right: Camera Panel Minimize Toggle, Timer & End Session */}
+        <div className="flex items-center gap-3">
+          {/* Minimize / Maximize Video Panel Button */}
+          <button
+            onClick={() => setIsVideoPanelMinimized(!isVideoPanelMinimized)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border",
+              isVideoPanelMinimized
+                ? "bg-indigo-600/30 text-indigo-300 border-indigo-400/40 hover:bg-indigo-600/40"
+                : "bg-slate-900/80 text-slate-300 border-white/10 hover:bg-slate-800"
+            )}
+            title={isVideoPanelMinimized ? "Dock Video to Sidebar" : "Float Camera on Canvas (Maximize Canvas)"}
+          >
+            {isVideoPanelMinimized ? (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Dock Video</span>
+              </>
+            ) : (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Float Video (PiP)</span>
+              </>
+            )}
+          </button>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/80 border border-white/10 rounded-xl font-mono text-xs font-bold text-emerald-400">
             <Clock className="w-3.5 h-3.5" />
             <span>{formatTime(sessionElapsedSeconds)}</span>
           </div>
-        </div>
-
-        {/* Right: Student Boards Drawer Toggle & End Session Button */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsStudentBoardsDrawerOpen(!isStudentBoardsDrawerOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-semibold transition-colors"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Student Boards</span>
-          </button>
 
           <button
             onClick={handleEndSession}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition-all hover:scale-105 active:scale-95"
           >
             <PhoneOff className="w-3.5 h-3.5" />
-            <span>End Session</span>
+            <span>End Class</span>
           </button>
         </div>
       </header>
+      <BoardAccess sessionId={sessionId} />
 
       {/* Main Workspace Layout */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        {/* Left / Top: Mock Video Area (Teacher Camera + Student Camera) */}
-        <div className="w-full md:w-80 lg:w-96 bg-slate-900 border-r border-slate-800 flex flex-col p-3 gap-3 shrink-0 overflow-y-auto">
-          {/* Teacher Video Tile */}
-          <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-md group">
-            {isCameraOn ? (
-              <div className="w-full h-full relative flex items-center justify-center bg-slate-900">
-                <img
-                  src={currentSession.teacherAvatar}
-                  alt={currentSession.teacherName}
-                  className="w-full h-full object-cover opacity-90"
-                />
-                {/* Simulated active speaker wave */}
-                {isMicOn && (
-                  <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-slate-950/70 backdrop-blur-xs px-2 py-1 rounded-md">
-                    <div className="w-1 h-3 bg-emerald-400 audio-bar rounded-full" />
-                    <div className="w-1 h-4 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.2s" }} />
-                    <div className="w-1 h-2 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.4s" }} />
-                  </div>
+        {/* Left Side Panel (Visible when NOT Minimized) */}
+        {!isVideoPanelMinimized && (
+          <div className="w-full md:w-84 lg:w-92 bg-slate-950/80 border-r border-white/10 flex flex-col p-4 gap-4 shrink-0 overflow-y-auto z-10 backdrop-blur-md animate-in slide-in-from-left duration-200">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Device preview</span>
+              <button
+                onClick={() => setIsVideoPanelMinimized(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Minimize video to floating board pop-up"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Teacher Tile (Real Camera) */}
+            <LiveVideoTile
+              participantName={`You (${user.name})`}
+              roleLabel="Teacher"
+              isLocalUser={true}
+              isCameraOn={isCameraOn}
+              isMicOn={isMicOn}
+              fallbackAvatar={currentSession.teacherAvatar}
+            />
+
+            {/* Student Tile */}
+            <LiveVideoTile
+              participantName={studentObj.name}
+              roleLabel="Student"
+              isLocalUser={false}
+              isCameraOn={true}
+              isMicOn={true}
+              fallbackAvatar={studentObj.avatar}
+            />
+
+            {/* Floating Media Controls */}
+            <div className="flex items-center justify-center gap-2.5 p-2 bg-slate-900/90 border border-white/10 rounded-2xl shadow-xl">
+              <button
+                onClick={() => setIsMicOn(!isMicOn)}
+                className={cn(
+                  "p-3 rounded-xl transition-all shadow-sm",
+                  isMicOn
+                    ? "bg-slate-800 hover:bg-slate-700 text-white"
+                    : "bg-rose-600 text-white animate-pulse"
                 )}
+                title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
+              >
+                {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </button>
+
+              <button
+                onClick={() => setIsCameraOn(!isCameraOn)}
+                className={cn(
+                  "p-3 rounded-xl transition-all shadow-sm",
+                  isCameraOn
+                    ? "bg-slate-800 hover:bg-slate-700 text-white"
+                    : "bg-rose-600 text-white animate-pulse"
+                )}
+                title={isCameraOn ? "Turn Camera Off" : "Turn Camera On"}
+              >
+                {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              </button>
+
+              <button
+                onClick={() => setIsScreenSharing(!isScreenSharing)}
+                className={cn(
+                  "p-3 rounded-xl transition-all shadow-sm",
+                  isScreenSharing ? "bg-indigo-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-white"
+                )}
+                title="Share Screen"
+              >
+                <ScreenShare className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Student Assessment Summary */}
+            <div className="p-4 bg-slate-900/60 border border-white/10 rounded-2xl space-y-2 text-xs">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="font-semibold">{studentObj.name}</span>
+                <span className="font-bold text-indigo-400">{studentObj.overallProgress}% Progress</span>
               </div>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500">
-                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-bold mb-2">
-                  AT
-                </div>
-                <span className="text-xs">Camera Off</span>
-              </div>
-            )}
-
-            {/* Name Tag */}
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur-xs rounded text-[11px] font-bold text-white flex items-center gap-1.5">
-              <span>You (Alex Thomas)</span>
-              <span className="text-[10px] text-indigo-400">Teacher</span>
-            </div>
-
-            <div className="absolute top-2 right-2 flex items-center gap-1">
-              {!isMicOn && (
-                <div className="p-1 rounded bg-rose-500/80 text-white">
-                  <MicOff className="w-3 h-3" />
-                </div>
-              )}
+              <p className="text-[11px] text-slate-400 italic">
+                "{studentObj.notes || "Mastering quadratic factorisation roots"}"
+              </p>
             </div>
           </div>
+        )}
 
-          {/* Student Video Tile */}
-          <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-md">
-            <div className="w-full h-full relative flex items-center justify-center bg-slate-900">
-              <img
-                src={studentObj.avatar}
-                alt={studentObj.name}
-                className="w-full h-full object-cover opacity-90"
-              />
-              <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-slate-950/70 backdrop-blur-xs px-2 py-1 rounded-md">
-                <div className="w-1 h-2 bg-emerald-400 audio-bar rounded-full" />
-                <div className="w-1 h-3.5 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.3s" }} />
-                <div className="w-1 h-1.5 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.1s" }} />
-              </div>
-            </div>
-
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur-xs rounded text-[11px] font-bold text-white flex items-center gap-1.5">
-              <span>{studentObj.name}</span>
-              <span className="text-[10px] text-emerald-400">Student</span>
-            </div>
-
-            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-emerald-950/80 border border-emerald-800 rounded text-[10px] font-bold text-emerald-400">
-              HD 60fps
-            </div>
-          </div>
-
-          {/* Video Control Bar */}
-          <div className="flex items-center justify-center gap-2 p-2 bg-slate-950 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setIsMicOn(!isMicOn)}
-              className={cn(
-                "p-2.5 rounded-lg transition-all",
-                isMicOn ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-rose-600 text-white"
-              )}
-              title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
-            >
-              {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={() => setIsCameraOn(!isCameraOn)}
-              className={cn(
-                "p-2.5 rounded-lg transition-all",
-                isCameraOn ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-rose-600 text-white"
-              )}
-              title={isCameraOn ? "Turn Camera Off" : "Turn Camera On"}
-            >
-              {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={() => setIsScreenSharing(!isScreenSharing)}
-              className={cn(
-                "p-2.5 rounded-lg transition-all",
-                isScreenSharing ? "bg-indigo-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-              )}
-              title="Share Screen"
-            >
-              <ScreenShare className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Quick Active Student Summary */}
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Student Progress</span>
-              <span className="font-bold text-white">{studentObj.overallProgress}%</span>
-            </div>
-            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-500 rounded-full"
-                style={{ width: `${studentObj.overallProgress}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-400 italic">
-              "{studentObj.notes || "Ready for quadratic roots factorisation"}"
-            </p>
-          </div>
-        </div>
-
-        {/* Right / Center: Collaborative Infinite Whiteboard Workspace */}
+        {/* Right Workspace (Expands to 100% width when Video Panel is Minimized) */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-          {/* Top Classroom Bar: Board Switcher */}
-          <div className="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+          {/* Top Secondary Bar */}
+          <div className="p-3 border-b border-slate-200/80 bg-slate-50/90 backdrop-blur-md flex items-center justify-between shrink-0">
             <StudentBoardSelector
               currentWhiteboardId={activeWhiteboardId}
               onSelectBoard={(id) => setActiveWhiteboardId(id)}
@@ -299,15 +347,29 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
               isTeacherMode={true}
             />
 
-            <div className="flex items-center gap-2">
-              <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                Live Sync Active
-              </span>
-            </div>
+            {/* In-Class Assignment Marking Banner if in ASSIGNMENT_VIEW */}
+            {workspaceMode === "ASSIGNMENT_VIEW" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 hidden sm:inline">
+                  Score:
+                </span>
+                <input
+                  type="number"
+                  value={liveGradeScore}
+                  onChange={(e) => setLiveGradeScore(parseInt(e.target.value, 10) || 0)}
+                  className="w-14 px-2 py-1 text-xs font-bold bg-white border border-slate-300 rounded-lg text-center"
+                />
+                <button
+                  onClick={handleSaveLiveGrade}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors"
+                >
+                  Save Marks
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Infinite Whiteboard Canvas Engine */}
+          {/* Interactive Infinite Canvas */}
           <div className="flex-1 w-full h-full relative">
             <WhiteboardCanvas
               key={activeWhiteboardId}
@@ -315,69 +377,121 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
               whiteboardId={activeWhiteboardId}
               roleLabel="Teacher"
               showTeacherTools={true}
-              onSave={(newElements) => {
-                updateWhiteboardElements(activeWhiteboardId, newElements);
+              readOnly={!currentWhiteboard}
+              onSave={(newElements, previousElements) => {
+                updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
               }}
             />
+
+            {/* FLOATING VIDEO CAMERA POP-UP ON BOARD ONLY (When Minimized) */}
+            {isVideoPanelMinimized && (
+              <div
+                className={cn(
+                  "absolute z-40 p-3 glass-dark rounded-3xl shadow-2xl border border-white/20 flex flex-col gap-2.5 animate-in zoom-in-95 duration-150 backdrop-blur-xl",
+                  pipPosition === "bottom-right" && "bottom-6 right-6 w-80 sm:w-92",
+                  pipPosition === "top-right" && "top-20 right-6 w-80 sm:w-92",
+                  pipPosition === "bottom-left" && "bottom-6 left-6 w-80 sm:w-92"
+                )}
+              >
+                {/* Pop-up Drag / Control Bar */}
+                <div className="flex items-center justify-between px-1.5 py-0.5 text-xs text-slate-300">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live 1:1 Camera Pop-up</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Switch Corner Position */}
+                    <button
+                      onClick={() =>
+                        setPipPosition((prev) =>
+                          prev === "bottom-right"
+                            ? "top-right"
+                            : prev === "top-right"
+                            ? "bottom-left"
+                            : "bottom-right"
+                        )
+                      }
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      title="Move pop-up position"
+                    >
+                      <Move className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Restore Docked Sidebar */}
+                    <button
+                      onClick={() => setIsVideoPanelMinimized(false)}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      title="Dock camera back to side panel"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Compact Stacked Video Feeds (Clean, Non-overlapping) */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <LiveVideoTile
+                    participantName={user.name + " (You)"}
+                    roleLabel="Teacher"
+                    isLocalUser={true}
+                    isCameraOn={isCameraOn}
+                    isMicOn={isMicOn}
+                    fallbackAvatar={currentSession.teacherAvatar}
+                    compact={true}
+                    className="aspect-video rounded-2xl"
+                  />
+                  <LiveVideoTile
+                    participantName={studentObj.name}
+                    roleLabel="Student"
+                    isLocalUser={false}
+                    isCameraOn={true}
+                    isMicOn={true}
+                    fallbackAvatar={studentObj.avatar}
+                    compact={true}
+                    className="aspect-video rounded-2xl"
+                  />
+                </div>
+
+                {/* Compact Controls */}
+                <div className="flex items-center justify-around px-3 py-1.5 bg-slate-900/90 rounded-2xl border border-white/10 shadow-inner">
+                  <button
+                    onClick={() => setIsMicOn(!isMicOn)}
+                    className={cn(
+                      "p-2 rounded-xl text-xs transition-all",
+                      isMicOn ? "text-slate-300 hover:text-white hover:bg-white/10" : "text-rose-500 bg-rose-500/10"
+                    )}
+                    title={isMicOn ? "Mute Mic" : "Unmute Mic"}
+                  >
+                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    onClick={() => setIsCameraOn(!isCameraOn)}
+                    className={cn(
+                      "p-2 rounded-xl text-xs transition-all",
+                      isCameraOn ? "text-slate-300 hover:text-white hover:bg-white/10" : "text-rose-500 bg-rose-500/10"
+                    )}
+                    title={isCameraOn ? "Turn Cam Off" : "Turn Cam On"}
+                  >
+                    {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    onClick={() => setIsScreenSharing(!isScreenSharing)}
+                    className={cn(
+                      "p-2 rounded-xl text-xs transition-all",
+                      isScreenSharing ? "text-indigo-400 bg-indigo-500/20" : "text-slate-300 hover:text-white hover:bg-white/10"
+                    )}
+                    title="Share Screen"
+                  >
+                    <ScreenShare className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Student Boards Inspection Flyout Panel */}
-        {isStudentBoardsDrawerOpen && (
-          <div className="absolute top-0 right-0 bottom-0 w-80 bg-white border-l border-slate-200 shadow-2xl z-40 flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Student Boards Inspector</h3>
-                <p className="text-xs text-slate-500">View & annotate student work live</p>
-              </div>
-              <button
-                onClick={() => setIsStudentBoardsDrawerOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {students.map((st) => {
-                const bds = whiteboards.filter((w) => w.studentId === st.id);
-                return (
-                  <div key={st.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <img src={st.avatar} alt={st.name} className="w-6 h-6 rounded-full object-cover" />
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">{st.name}</p>
-                        <p className="text-[10px] text-slate-500">{st.grade}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      {bds.map((b) => (
-                        <button
-                          key={b.id}
-                          onClick={() => {
-                            setSelectedStudentId(st.id);
-                            setActiveWhiteboardId(b.id);
-                            setIsStudentBoardsDrawerOpen(false);
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition-colors",
-                            b.id === activeWhiteboardId
-                              ? "bg-indigo-600 text-white font-bold"
-                              : "bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200"
-                          )}
-                        >
-                          <span className="truncate">{b.title}</span>
-                          <span className="text-[10px] opacity-75">{b.elements.length} items</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

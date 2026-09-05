@@ -1,10 +1,12 @@
 "use client";
 
+import { BoardAccess } from "@/components/session/BoardAccess";
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
+import { LiveVideoTile } from "@/components/session/LiveVideoTile";
 import { formatTime } from "@/lib/utils";
 import {
   Mic,
@@ -16,7 +18,11 @@ import {
   Circle,
   ShieldCheck,
   Sparkles,
-  Layers,
+  BookOpen,
+  GraduationCap,
+  Minimize2,
+  Maximize2,
+  Move,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +36,7 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
   const router = useRouter();
 
   const {
+    user,
     sessions,
     whiteboards,
     activeSession,
@@ -38,39 +45,25 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
     updateWhiteboardElements,
   } = useLMS();
 
-  const currentSession =
-    sessions.find((s) => s.id === sessionId) ||
-    activeSession || {
-      id: sessionId,
-      teacherId: "t1",
-      teacherName: "Alex Thomas",
-      teacherAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      studentId: "s1",
-      studentName: "Rahul Menon",
-      studentAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-      subject: "Mathematics",
-      topic: "Quadratic Equations — Roots & Factorisation",
-      date: new Date().toISOString().split("T")[0],
-      scheduledTime: "04:00 PM",
-      durationMinutes: 60,
-      status: "LIVE" as const,
-      whiteboardId: "wb-live-math-rahul",
-    };
+  const currentSession = sessions.find((s) => s.id === sessionId) || activeSession;
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isVideoPanelMinimized, setIsVideoPanelMinimized] = useState(false);
+  const [pipPosition, setPipPosition] = useState<"bottom-right" | "top-right" | "bottom-left">("bottom-right");
+
   const [activeWhiteboardId, setActiveWhiteboardId] = useState(
-    currentSession.whiteboardId || "wb-live-math-rahul"
+    currentSession?.whiteboardId || ""
   );
 
   useEffect(() => {
-    if (!activeSession) {
+    if (currentSession && currentSession.status === "LIVE" && !activeSession) {
       startLiveSession(sessionId);
     }
-  }, [sessionId, activeSession, startLiveSession]);
+  }, [sessionId, currentSession, activeSession, startLiveSession]);
 
   const currentWhiteboard =
-    whiteboards.find((w) => w.id === activeWhiteboardId) || whiteboards[0];
+    whiteboards.find((w) => w.id === (activeWhiteboardId || currentSession?.whiteboardId));
 
   const handleLeaveSession = () => {
     if (window.confirm("Are you sure you want to leave the live classroom?")) {
@@ -78,169 +71,262 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
     }
   };
 
+  if (!currentSession) {
+    return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-300">Session not found.</div>;
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
-      {/* Student Classroom Header */}
-      <header className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold text-slate-200">1:1 LIVE CLASS</span>
+      {/* Student Classroom Header (Glassmorphic) */}
+      <header className="h-16 px-5 glass-dark flex items-center justify-between shrink-0 z-30">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-xs font-extrabold tracking-wide uppercase">1:1 Live</span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="text-sm font-bold text-white">
+          <div className="hidden sm:flex items-center gap-2.5">
+            <span className="text-sm font-bold text-white tracking-tight">
               Educator: {currentSession.teacherName}
             </span>
-            <span className="text-xs text-slate-400">•</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            <span className="text-slate-600">•</span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
               {currentSession.subject}
             </span>
-            <span className="text-xs text-slate-400 hidden md:inline truncate max-w-xs">
+            <span className="text-xs text-slate-400 hidden lg:inline max-w-sm truncate">
               {currentSession.topic}
             </span>
           </div>
         </div>
 
         {/* Center: Live Timer */}
-        <div className="flex items-center gap-3 bg-slate-800/80 px-3.5 py-1 rounded-xl border border-slate-700">
-          <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold">
-            <Circle className="w-2.5 h-2.5 fill-rose-500 animate-ping" />
-            <span>LIVE</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-slate-700" />
-          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{formatTime(sessionElapsedSeconds)}</span>
-          </div>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900/80 border border-white/10 rounded-xl font-mono text-xs font-bold text-emerald-400">
+          <Clock className="w-3.5 h-3.5" />
+          <span>{formatTime(sessionElapsedSeconds)}</span>
         </div>
 
-        {/* Right: Leave Button */}
-        <div className="flex items-center gap-2">
+        {/* Right: Camera Minimize & Leave Button */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsVideoPanelMinimized(!isVideoPanelMinimized)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border",
+              isVideoPanelMinimized
+                ? "bg-indigo-600/30 text-indigo-300 border-indigo-400/40 hover:bg-indigo-600/40"
+                : "bg-slate-900/80 text-slate-300 border-white/10 hover:bg-slate-800"
+            )}
+            title={isVideoPanelMinimized ? "Dock Video to Sidebar" : "Float Camera on Canvas"}
+          >
+            {isVideoPanelMinimized ? (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Dock Video</span>
+              </>
+            ) : (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Float Video (PiP)</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleLeaveSession}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition-colors"
           >
             <PhoneOff className="w-3.5 h-3.5" />
-            <span>Leave Class</span>
+            <span>Leave Room</span>
           </button>
         </div>
       </header>
+      <BoardAccess sessionId={sessionId} />
 
-      {/* Main Classroom Split Screen */}
+      {/* Main Workspace Layout */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        {/* Left: Video Tiles (Teacher & Student) */}
-        <div className="w-full md:w-80 lg:w-96 bg-slate-900 border-r border-slate-800 flex flex-col p-3 gap-3 shrink-0 overflow-y-auto">
-          {/* Teacher Tile (Prominent) */}
-          <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-md">
-            <div className="w-full h-full relative flex items-center justify-center bg-slate-900">
-              <img
-                src={currentSession.teacherAvatar}
-                alt={currentSession.teacherName}
-                className="w-full h-full object-cover opacity-90"
-              />
-              <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-slate-950/70 backdrop-blur-xs px-2 py-1 rounded-md">
-                <div className="w-1 h-3 bg-emerald-400 audio-bar rounded-full" />
-                <div className="w-1 h-4 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.2s" }} />
-                <div className="w-1 h-2 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.4s" }} />
-              </div>
+        {/* Left Side Video Panel (When not minimized) */}
+        {!isVideoPanelMinimized && (
+          <div className="w-full md:w-84 lg:w-92 bg-slate-950/80 border-r border-white/10 flex flex-col p-4 gap-4 shrink-0 overflow-y-auto z-10 backdrop-blur-md animate-in slide-in-from-left duration-200">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Device preview</span>
+              <button
+                onClick={() => setIsVideoPanelMinimized(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Minimize video to floating board pop-up"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur-xs rounded text-[11px] font-bold text-white flex items-center gap-1.5">
-              <span>{currentSession.teacherName}</span>
-              <span className="text-[10px] text-indigo-400">Teacher</span>
-            </div>
+            {/* Teacher Stream */}
+            <LiveVideoTile
+              participantName={currentSession.teacherName}
+              roleLabel="Teacher"
+              isLocalUser={false}
+              isCameraOn={true}
+              isMicOn={true}
+              fallbackAvatar={currentSession.teacherAvatar}
+            />
 
-            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-emerald-950/80 border border-emerald-800 rounded text-[10px] font-bold text-emerald-400">
-              HD 60fps
-            </div>
-          </div>
+            {/* Student Self Stream (Real Camera) */}
+            <LiveVideoTile
+              participantName={`You (${currentSession.studentName})`}
+              roleLabel="Student"
+              isLocalUser={true}
+              isCameraOn={isCameraOn}
+              isMicOn={isMicOn}
+              fallbackAvatar={currentSession.studentAvatar}
+            />
 
-          {/* Student Tile (Self) */}
-          <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-md">
-            {isCameraOn ? (
-              <div className="w-full h-full relative flex items-center justify-center bg-slate-900">
-                <img
-                  src={currentSession.studentAvatar}
-                  alt={currentSession.studentName}
-                  className="w-full h-full object-cover opacity-90"
-                />
-                {isMicOn && (
-                  <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-slate-950/70 backdrop-blur-xs px-2 py-1 rounded-md">
-                    <div className="w-1 h-2 bg-emerald-400 audio-bar rounded-full" />
-                    <div className="w-1 h-3.5 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.3s" }} />
-                    <div className="w-1 h-1.5 bg-emerald-400 audio-bar rounded-full" style={{ animationDelay: "0.1s" }} />
-                  </div>
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-2.5 p-2 bg-slate-900/90 border border-white/10 rounded-2xl shadow-xl">
+              <button
+                onClick={() => setIsMicOn(!isMicOn)}
+                className={cn(
+                  "p-3 rounded-xl transition-all shadow-sm",
+                  isMicOn ? "bg-slate-800 hover:bg-slate-700 text-white" : "bg-rose-600 text-white animate-pulse"
                 )}
-              </div>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-bold mb-2">
-                  RM
-                </div>
-                <span className="text-xs">Camera Off</span>
-              </div>
-            )}
+                title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
+              >
+                {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </button>
 
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur-xs rounded text-[11px] font-bold text-white flex items-center gap-1.5">
-              <span>You (Rahul Menon)</span>
-              <span className="text-[10px] text-emerald-400">Student</span>
+              <button
+                onClick={() => setIsCameraOn(!isCameraOn)}
+                className={cn(
+                  "p-3 rounded-xl transition-all shadow-sm",
+                  isCameraOn ? "bg-slate-800 hover:bg-slate-700 text-white" : "bg-rose-600 text-white animate-pulse"
+                )}
+                title={isCameraOn ? "Turn Camera Off" : "Turn Camera On"}
+              >
+                {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Media Control Bar */}
-          <div className="flex items-center justify-center gap-2 p-2 bg-slate-950 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setIsMicOn(!isMicOn)}
-              className={cn(
-                "p-2.5 rounded-lg transition-all",
-                isMicOn ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-rose-600 text-white"
-              )}
-              title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
-            >
-              {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={() => setIsCameraOn(!isCameraOn)}
-              className={cn(
-                "p-2.5 rounded-lg transition-all",
-                isCameraOn ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-rose-600 text-white"
-              )}
-              title={isCameraOn ? "Turn Camera Off" : "Turn Camera On"}
-            >
-              {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Right: Collaborative Infinite Whiteboard Canvas */}
+        {/* Right: Collaborative Infinite Canvas */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-          <div className="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="p-3 border-b border-slate-200/80 bg-slate-50/90 backdrop-blur-md flex items-center justify-between shrink-0">
             <StudentBoardSelector
               currentWhiteboardId={activeWhiteboardId}
               onSelectBoard={(id) => setActiveWhiteboardId(id)}
-              selectedStudentId="s1"
+              selectedStudentId={user.id}
               isTeacherMode={false}
             />
 
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Shared Live Board
+              Shared Live Canvas
             </span>
           </div>
 
           <div className="flex-1 w-full h-full relative">
             <WhiteboardCanvas
+                  readOnly={currentWhiteboard?.category === "LIVE_CLASS" && (currentSession.status !== "LIVE" || ((currentSession.studentIds?.length || 1) > 1 && !currentSession.writerIds?.includes(user.id)))}
               key={activeWhiteboardId}
               initialWhiteboard={currentWhiteboard}
               whiteboardId={activeWhiteboardId}
               roleLabel="Student"
               showTeacherTools={false}
-              onSave={(newElements) => {
-                updateWhiteboardElements(activeWhiteboardId, newElements);
+              onSave={(newElements, previousElements) => {
+                updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
               }}
             />
+
+            {/* FLOATING VIDEO CAMERA POP-UP ON BOARD (When Minimized) */}
+            {isVideoPanelMinimized && (
+              <div
+                className={cn(
+                  "absolute z-40 p-3 glass-dark rounded-3xl shadow-2xl border border-white/20 flex flex-col gap-2.5 animate-in zoom-in-95 duration-150 backdrop-blur-xl",
+                  pipPosition === "bottom-right" && "bottom-6 right-6 w-80 sm:w-92",
+                  pipPosition === "top-right" && "top-20 right-6 w-80 sm:w-92",
+                  pipPosition === "bottom-left" && "bottom-6 left-6 w-80 sm:w-92"
+                )}
+              >
+                {/* Pop-up Drag / Control Bar */}
+                <div className="flex items-center justify-between px-1.5 py-0.5 text-xs text-slate-300">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live 1:1 Camera Pop-up</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() =>
+                        setPipPosition((prev) =>
+                          prev === "bottom-right"
+                            ? "top-right"
+                            : prev === "top-right"
+                            ? "bottom-left"
+                            : "bottom-right"
+                        )
+                      }
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      title="Move pop-up position"
+                    >
+                      <Move className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => setIsVideoPanelMinimized(false)}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      title="Dock camera back to side panel"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Compact Stacked Video Feeds */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <LiveVideoTile
+                    participantName={currentSession.teacherName}
+                    roleLabel="Teacher"
+                    isLocalUser={false}
+                    isCameraOn={true}
+                    isMicOn={true}
+                    fallbackAvatar={currentSession.teacherAvatar}
+                    compact={true}
+                    className="aspect-video rounded-2xl"
+                  />
+                  <LiveVideoTile
+                    participantName={user.name + " (You)"}
+                    roleLabel="Student"
+                    isLocalUser={true}
+                    isCameraOn={isCameraOn}
+                    isMicOn={isMicOn}
+                    fallbackAvatar={currentSession.studentAvatar}
+                    compact={true}
+                    className="aspect-video rounded-2xl"
+                  />
+                </div>
+
+                {/* Compact Controls */}
+                <div className="flex items-center justify-around px-3 py-1.5 bg-slate-900/90 rounded-2xl border border-white/10 shadow-inner">
+                  <button
+                    onClick={() => setIsMicOn(!isMicOn)}
+                    className={cn(
+                      "p-2 rounded-xl text-xs transition-all",
+                      isMicOn ? "text-slate-300 hover:text-white hover:bg-white/10" : "text-rose-500 bg-rose-500/10"
+                    )}
+                    title={isMicOn ? "Mute Mic" : "Unmute Mic"}
+                  >
+                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    onClick={() => setIsCameraOn(!isCameraOn)}
+                    className={cn(
+                      "p-2 rounded-xl text-xs transition-all",
+                      isCameraOn ? "text-slate-300 hover:text-white hover:bg-white/10" : "text-rose-500 bg-rose-500/10"
+                    )}
+                    title={isCameraOn ? "Turn Cam Off" : "Turn Cam On"}
+                  >
+                    {isCameraOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

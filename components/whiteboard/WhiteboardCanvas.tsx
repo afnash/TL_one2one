@@ -1,5 +1,6 @@
 "use client";
 
+import { useLMS } from "@/lib/store";
 import React, {
   useRef,
   useState,
@@ -45,7 +46,7 @@ import { cn } from "@/lib/utils";
 interface WhiteboardCanvasProps {
   initialWhiteboard?: Whiteboard;
   whiteboardId?: string;
-  onSave?: (elements: WhiteboardElement[]) => void;
+  onSave?: (elements: WhiteboardElement[], previousElements?: WhiteboardElement[]) => void;
   readOnly?: boolean;
   roleLabel?: string;
   showTeacherTools?: boolean;
@@ -68,11 +69,14 @@ const STROKE_WIDTHS = [2, 4, 8, 14];
 export function WhiteboardCanvas({
   initialWhiteboard,
   onSave,
-  readOnly = false,
+  readOnly: suppliedReadOnly = false,
   roleLabel = "Live Board",
   showTeacherTools = true,
   className,
 }: WhiteboardCanvasProps) {
+  const { user, role, sessions, submissions, saving, connectionError } = useLMS();
+  const session = sessions.find(s => s.whiteboardId === initialWhiteboard?.id);
+  const readOnly = suppliedReadOnly || (role === "STUDENT" && (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" || submissions.some(s=>s.whiteboardId===initialWhiteboard?.id && ["SUBMITTED","REVIEWED"].includes(s.status)))) || (role === "STUDENT" && !!session && (session.status !== "LIVE" || ((session.studentIds?.length || 1) > 1 && !session.writerIds?.includes(user.id))));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -112,21 +116,14 @@ export function WhiteboardCanvas({
     text: "",
   });
 
-  // Simulated peer cursor for collaboration wow-factor
-  const [peerCursor, setPeerCursor] = useState<{ x: number; y: number; name: string } | null>({
-    x: 340,
-    y: 220,
-    name: roleLabel === "Teacher" ? "Rahul (Student)" : "Alex (Teacher)",
-  });
-
   // Notify parent of updates
   const notifySave = useCallback(
     (newElements: WhiteboardElement[]) => {
       if (onSave) {
-        onSave(newElements);
+        onSave(newElements, elements);
       }
     },
-    [onSave]
+    [onSave, elements]
   );
 
   // Push element state to history
@@ -151,6 +148,8 @@ export function WhiteboardCanvas({
       setHistoryIndex(0);
     }
   }, [initialWhiteboard?.id]);
+
+  useEffect(() => { if (!isDrawing && initialWhiteboard?.elements) setElements(initialWhiteboard.elements); }, [initialWhiteboard?.elements, isDrawing]);
 
   // Handle canvas sizing and redraw
   const redrawCanvas = useCallback(() => {
@@ -400,23 +399,6 @@ export function WhiteboardCanvas({
     return () => window.removeEventListener("resize", handleResize);
   }, [redrawCanvas]);
 
-  // Simulated peer cursor moving subtly
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPeerCursor((prev) => {
-        if (!prev) return null;
-        const dx = (Math.random() - 0.5) * 15;
-        const dy = (Math.random() - 0.5) * 15;
-        return {
-          ...prev,
-          x: Math.max(100, Math.min(600, prev.x + dx)),
-          y: Math.max(100, Math.min(400, prev.y + dy)),
-        };
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Mouse Coordinates converted to Virtual Canvas Coordinates
   const getCanvasCoords = (e: MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -459,7 +441,7 @@ export function WhiteboardCanvas({
 
     if (activeTool === "stamp") {
       const newElement: WhiteboardElement = {
-        id: `stamp-${Date.now()}`,
+        id: crypto.randomUUID(),
         type: "stamp",
         x: x - 16,
         y: y - 16,
@@ -473,7 +455,7 @@ export function WhiteboardCanvas({
 
     if (activeTool === "sticky") {
       const newElement: WhiteboardElement = {
-        id: `sticky-${Date.now()}`,
+        id: crypto.randomUUID(),
         type: "sticky",
         x: x - 100,
         y: y - 60,
@@ -510,7 +492,7 @@ export function WhiteboardCanvas({
 
     if (activeTool === "pen" || activeTool === "highlighter") {
       setCurrentElement({
-        id: `el-${Date.now()}`,
+        id: crypto.randomUUID(),
         type: activeTool,
         x,
         y,
@@ -646,7 +628,7 @@ export function WhiteboardCanvas({
     }
 
     const newElement: WhiteboardElement = {
-      id: `text-${Date.now()}`,
+      id: crypto.randomUUID(),
       type: "text",
       x: textInput.x,
       y: textInput.y,
@@ -1081,21 +1063,7 @@ export function WhiteboardCanvas({
         </div>
       )}
 
-      {/* Simulated Live Peer Collaborative Cursor */}
-      {peerCursor && (
-        <div
-          className="absolute z-10 pointer-events-none transition-all duration-700 ease-out flex items-center gap-1.5"
-          style={{
-            left: `${peerCursor.x * zoom + pan.x}px`,
-            top: `${peerCursor.y * zoom + pan.y}px`,
-          }}
-        >
-          <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm animate-pulse" />
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-600 text-white shadow-sm whitespace-nowrap">
-            {peerCursor.name}
-          </span>
-        </div>
-      )}
+
 
       {/* Bottom Status & Info Bar */}
       <div className="absolute bottom-3 left-3 z-10 flex items-center gap-3 px-3 py-1.5 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-lg text-xs text-slate-500 shadow-xs">
@@ -1107,7 +1075,7 @@ export function WhiteboardCanvas({
         <span>{elements.length} elements</span>
         <span className="text-slate-300">|</span>
         <span className="flex items-center gap-1 text-indigo-600 font-medium">
-          <Sparkles className="w-3 h-3" /> Auto-saved
+          <Sparkles className="w-3 h-3" /> {connectionError ? "Not saved ? check connection" : saving ? "Saving?" : "Synced"}
         </span>
       </div>
     </div>

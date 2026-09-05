@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, use } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
@@ -26,22 +26,31 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
   const assignmentId = resolvedParams.id;
   const router = useRouter();
 
-  const { assignments, submissions, whiteboards, submitAssignment, updateWhiteboardElements } = useLMS();
+  const { user, saveWhiteboard, assignments, submissions, whiteboards, submitAssignment, updateWhiteboardElements } = useLMS();
 
-  const assignment = assignments.find((a) => a.id === assignmentId) || assignments[0];
-  const submission = submissions.find((s) => s.assignmentId === assignmentId && s.studentId === "s1");
+  const assignment = assignments.find((a) => a.id === assignmentId);
+  const submission = submissions.find((s) => s.assignmentId === assignmentId && s.studentId === user.id);
 
   const [activeWhiteboardId, setActiveWhiteboardId] = useState<string>(
-    submission?.whiteboardId || "wb-rahul-math-hw"
+    submission?.whiteboardId || `work-${assignmentId}-${user.id}`
   );
   const [isSubmitted, setIsSubmitted] = useState<boolean>(
     submission?.status === "SUBMITTED" || submission?.status === "REVIEWED"
   );
+  const [mobileTab, setMobileTab] = useState<"QUESTIONS" | "WORK">("WORK");
 
   const currentBoard =
-    whiteboards.find((w) => w.id === activeWhiteboardId) || whiteboards[1];
+    whiteboards.find((w) => w.id === activeWhiteboardId);
+
+  useEffect(() => {
+    if (assignment && !currentBoard) {
+      const template = whiteboards.find(w=>w.id===assignment.whiteboardId);
+      saveWhiteboard({ id: activeWhiteboardId, title: assignment.title + " ? " + user.name, subject: assignment.subject, studentId: user.id, studentName: user.name, teacherId: assignment.teacherId, assignmentId: assignment.id, category: "ASSIGNMENT_SUBMISSION", elements: template?.elements || [], lastEdited: new Date().toISOString() });
+    }
+  }, [assignment?.id, currentBoard?.id]);
 
   const handleSubmit = () => {
+    if(!assignment || !currentBoard) return;
     // Launch celebratory confetti
     confetti({
       particleCount: 100,
@@ -49,9 +58,11 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
       origin: { y: 0.6 },
     });
 
-    submitAssignment(assignment.id, "s1", activeWhiteboardId);
+    submitAssignment(assignment.id, user.id, activeWhiteboardId);
     setIsSubmitted(true);
   };
+
+  if (!assignment) return <div className="p-10">Assignment not found.</div>;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900 overflow-hidden font-sans select-none">
@@ -104,6 +115,32 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
 
       {/* Main Workspace Layout */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="grid grid-cols-2 gap-1 border-b border-slate-200 bg-white p-2 lg:hidden">
+          <button
+            onClick={() => setMobileTab("QUESTIONS")}
+            className={cn("rounded-lg px-3 py-2 text-xs font-bold", mobileTab === "QUESTIONS" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600")}
+          >
+            Questions
+          </button>
+          <button
+            onClick={() => setMobileTab("WORK")}
+            className={cn("rounded-lg px-3 py-2 text-xs font-bold", mobileTab === "WORK" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600")}
+          >
+            My Work
+          </button>
+        </div>
+        {mobileTab === "QUESTIONS" && (
+          <div className="flex-1 space-y-3 overflow-y-auto bg-white p-4 lg:hidden">
+            {assignment.questions.map((question) => (
+              <article key={question.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-bold text-indigo-700">
+                  <span>Question {question.number}</span><span>{question.maxScore} marks</span>
+                </div>
+                <p className="text-sm leading-6 text-slate-800">{question.text}</p>
+              </article>
+            ))}
+          </div>
+        )}
         {/* Left: Questions Navigator Bar */}
         <div className="hidden lg:flex w-80 bg-white border-r border-slate-200 flex-col p-4 space-y-4 shrink-0 overflow-y-auto">
           <div className="space-y-1">
@@ -145,7 +182,7 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
         </div>
 
         {/* Center: Student Interactive Solution Whiteboard */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+        <div className={cn("flex-1 flex-col bg-white overflow-hidden relative", mobileTab === "WORK" ? "flex" : "hidden lg:flex")}>
           <div className="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600 shrink-0">
             <span className="font-semibold flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-indigo-600" />
@@ -162,9 +199,9 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
               whiteboardId={currentBoard?.id}
               roleLabel="Student"
               showTeacherTools={false}
-              onSave={(newElements) => {
+              onSave={(newElements, previousElements) => {
                 if (currentBoard) {
-                  updateWhiteboardElements(currentBoard.id, newElements);
+                  updateWhiteboardElements(currentBoard.id, newElements, previousElements);
                 }
               }}
             />

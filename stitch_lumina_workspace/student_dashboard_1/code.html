@@ -1,0 +1,250 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={theme:{extend:{"colors":{"on-surface":"#0b1c30","on-secondary-fixed-variant":"#005236","on-primary-fixed-variant":"#2f2ebe","surface-dim":"#cbdbf5","on-background":"#0b1c30","surface-container":"#e5eeff","inverse-surface":"#213145","background":"#f8f9ff","primary-fixed":"#e1e0ff","surface":"#f8f9ff","on-secondary-container":"#00714d","inverse-on-surface":"#eaf1ff","tertiary":"#825100","surface-variant":"#d3e4fe","primary":"#4648d4","surface-container-high":"#dce9ff","surface-bright":"#f8f9ff","secondary-container":"#6cf8bb","outline":"#767586","secondary":"#006c49","tertiary-container":"#a36700","error-container":"#ffdad6","on-tertiary-fixed-variant":"#653e00","on-tertiary":"#ffffff","inverse-primary":"#c0c1ff","on-primary-fixed":"#07006c","surface-container-lowest":"#ffffff","on-secondary":"#ffffff","primary-container":"#6063ee","secondary-fixed-dim":"#4edea3","on-surface-variant":"#464554","on-error":"#ffffff","on-tertiary-fixed":"#2a1700","on-secondary-fixed":"#002113","surface-container-highest":"#d3e4fe","on-error-container":"#93000a","secondary-fixed":"#6ffbbe","error":"#ba1a1a","tertiary-fixed-dim":"#ffb95f","on-primary":"#ffffff","outline-variant":"#c7c4d7","tertiary-fixed":"#ffddb8","on-tertiary-container":"#fffbff","surface-container-low":"#eff4ff","on-primary-container":"#fffbff","surface-tint":"#494bd6","primary-fixed-dim":"#c0c1ff"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"md":"16px","sm":"8px","unit":"4px","xl":"40px","lg":"24px","xs":"4px","container-max":"1200px","gutter":"20px"},"fontFamily":{"headline-md":["Geist"],"body-lg":["Inter"],"body-md":["Inter"],"label-md":["Geist"],"display-lg":["Geist"],"label-sm":["Geist"],"body-sm":["Inter"],"headline-lg":["Geist"]},"fontSize":{"headline-md":["24px",{"lineHeight":"1.3","fontWeight":"600"}],"body-lg":["18px",{"lineHeight":"1.6","fontWeight":"400"}],"body-md":["16px",{"lineHeight":"1.5","fontWeight":"400"}],"label-md":["14px",{"lineHeight":"1","fontWeight":"500"}],"display-lg":["48px",{"lineHeight":"1.1","letterSpacing":"-0.02em","fontWeight":"700"}],"label-sm":["12px",{"lineHeight":"1","letterSpacing":"0.02em","fontWeight":"500"}],"body-sm":["14px",{"lineHeight":"1.5","fontWeight":"400"}],"headline-lg":["32px",{"lineHeight":"1.2","letterSpacing":"-0.02em","fontWeight":"600"}]}}}}</script><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-background font-body-md text-on-background"><header class="fixed top-spacing-md left-spacing-md right-spacing-md h-20 bg-surface/60 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex items-center justify-between px-lg rounded-xl"><div class="flex items-center gap-sm"><img alt="Lumina Brand Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WsLlA-qblLCdvdhZmHZw8jOQBkdUvZAHi-soFyXBvkKE2TsMn-GZQmBusEwVPoxEQYAvCyn_CqDSluJ68-GW_twRhyK1F7-mcf0i93kTrtMwwYjuiN7d3UsTOUtSAt2EIfGQNDIT2Zb86RneFSp2jaCXXOtLMHpWZn8-Fs5SkVZauGcLbdrEYjAoLropVITjaubKQUIlM05L-BHw62cn5_vRZadX8VloW-LXf1O-03YiXzVbtRHoJv72mXHhSGIqP-PXhfWODIpeo"></div><nav class="hidden md:flex items-center gap-xl" data-active-classes="text-primary font-bold underline underline-offset-8 decoration-2"><a aria-current="page" class="transition-colors text-primary font-bold underline underline-offset-8 decoration-2" data-path="student-home" href="#">Home</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-sessions" href="#">Sessions</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-materials" href="#">Materials</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-progress" href="#">Progress</a></nav><div class="flex items-center gap-md"><span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-xs rounded-full hover:bg-surface-container">notifications</span><img alt="Profile" class="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-primary-fixed" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8tTMI1XkhTnZRgDBKIy6Hlt3A_JeolOLX9Wnez955fQMwwd-gn_-VpMAZexx5lrtUJK-h1xZUEWSBD9Ofd3YWxjga8isBjSsnKK4osnOvUCZoXXeQN61I14jKuPVGS1lV8rT8-xBaDsd815SrgO3pL9pS2m_I_xPPmRe0B8M4h25ePIOWXzAuIqJ5-wSzsIw1DnrFbN0NTLeMqeWBIf22YG0iqt34CHp3oWZuEhvSKxH9Yh_JqDjd0A"></div></header><main class="w-full pt-28 px-spacing-md bg-background"><div class="flex flex-col w-full gap-lg max-w-container-max mx-auto">
+<!-- Welcome & Overview -->
+<section class="flex flex-col lg:flex-row gap-lg">
+<!-- Main Welcome Card -->
+<div class="flex-1 bg-surface-container rounded-xl p-lg relative overflow-hidden shadow-sm flex flex-col justify-between">
+<div class="absolute inset-0 opacity-10 pointer-events-none">
+<svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="40" id="grid" patternUnits="userSpaceOnUse" width="40">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" stroke-width="1"></path>
+</pattern>
+</defs>
+<rect class="text-primary" fill="url(#grid)" height="100%" width="100%"></rect>
+</svg>
+</div>
+<div class="relative z-10 flex flex-col gap-md">
+<div>
+<h1 class="text-display-lg font-display-lg text-on-surface">Welcome back, Alex</h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant mt-xs">You're making great progress in your Advanced Calculus track.</p>
+</div>
+<div class="flex flex-wrap gap-md mt-sm">
+<div class="bg-surface rounded-lg p-md shadow-sm min-w-[140px] flex-1">
+<div class="flex items-center justify-between mb-sm">
+<span class="text-label-md font-label-md text-on-surface-variant uppercase tracking-wider">Current GPA</span>
+<span class="material-symbols-outlined text-primary text-[20px]">school</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-on-surface">3.8</div>
+</div>
+<div class="bg-surface rounded-lg p-md shadow-sm min-w-[140px] flex-1">
+<div class="flex items-center justify-between mb-sm">
+<span class="text-label-md font-label-md text-on-surface-variant uppercase tracking-wider">Study Streak</span>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-[20px]">local_fire_department</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-on-surface flex items-baseline gap-xs">
+                            12 <span class="text-body-sm font-body-sm text-on-surface-variant">days</span>
+</div>
+</div>
+<div class="bg-surface rounded-lg p-md shadow-sm min-w-[140px] flex-1">
+<div class="flex items-center justify-between mb-sm">
+<span class="text-label-md font-label-md text-on-surface-variant uppercase tracking-wider">Assignments</span>
+<span class="material-symbols-outlined text-error text-[20px]">assignment_late</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-on-surface flex items-baseline gap-xs">
+                            2 <span class="text-body-sm font-body-sm text-on-surface-variant">due soon</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Next Up Widget -->
+<div class="w-full lg:w-[320px] bg-primary rounded-xl p-lg shadow-md flex flex-col text-on-primary">
+<h2 class="text-label-md font-label-md uppercase tracking-wider opacity-80 mb-md">Up Next</h2>
+<div class="flex flex-col gap-sm flex-1 justify-center">
+<span class="text-body-sm font-body-sm bg-on-primary/20 self-start px-sm py-xs rounded-full">In 45 mins</span>
+<h3 class="text-headline-md font-headline-md mt-sm">Physics 201: Lab Session</h3>
+<div class="flex items-center gap-sm mt-xs opacity-90 text-body-sm font-body-sm">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span class="">Science Building, Room 4B</span>
+</div>
+<div class="flex items-center gap-sm mt-xs opacity-90 text-body-sm font-body-sm">
+<img class="w-6 h-6 rounded-full object-cover" data-alt="A small circular avatar of a middle-aged male professor wearing glasses and a tweed jacket, soft natural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHIy0_BoqBYElGcpqJ7p6XXDyp80FymPkb5VF7PFR3AROjKsxNFRJhf2AX-zdk0KS2CAlIiqLDHFmrojZrdsqtSE03ZMGGQij9Z1m6BWcWF8jzEzdheBmfFSxw7L251308xzD8Dj2VHemszv_t-2nT56BGrgRPdH1391bFqFvfCv9VA5_7kSuowLAjx4iFT4Rz3nnes-lfQp_vJP-TC5OLLWwNo_0XYUg1UH3wYE8-0VGjFATF1PwwHg">
+<span class="">Prof. Harrison</span>
+</div>
+</div>
+<button class="w-full bg-on-primary text-primary font-label-md text-label-md py-sm px-md rounded-lg mt-md hover:bg-on-primary/90 transition-colors shadow-sm flex justify-center items-center gap-sm">
+<span class="">View Details</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</section>
+<!-- Main Grid Content -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-lg">
+<!-- Left Column (Wider) -->
+<div class="xl:col-span-2 flex flex-col gap-lg">
+<!-- Active Courses -->
+<section>
+<div class="flex justify-between items-end mb-md">
+<h2 class="text-headline-md font-headline-md text-on-background">Active Courses</h2>
+<a class="text-label-md font-label-md text-primary hover:underline" href="#">View All</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Course Card 1 -->
+<div class="bg-surface rounded-xl p-md shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+<div class="w-full h-32 rounded-lg mb-md bg-cover bg-center overflow-hidden" data-alt="Abstract geometric shapes representing calculus, intersecting lines, curves, deep blues and purples, subtle glowing grid lines, modern academic style." style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuDFUqw42WnJMLU3V7lSjOANXckJwWeHxKbt8Hg4C-oROONqnv0hoN-dFhwtTNXm0nqbWIwGdJ2UQZFqkWemVMoCpurCdGOqgTpz9mLE7EkH_5kkx-LBTzKG8tUmsjUI4CVJv3fCzKZV1BjjrHPEc0crZIti4d_kMR78LQTyfwIKIqddH1acUNBH5XmYd1z_KZfQooBCM0REbwNTl6tLKVlmjVqMnUECwIrfg5pFLaLqaN5h_C5mdJ3omg&quot;);">
+<div class="w-full h-full bg-gradient-to-t from-surface-inverse/80 to-transparent flex items-end p-sm">
+<span class="bg-surface-container/90 backdrop-blur-sm text-on-surface text-label-sm font-label-sm px-sm py-xs rounded">MATH 301</span>
+</div>
+</div>
+<h3 class="text-body-lg font-body-lg font-medium text-on-surface mb-xs group-hover:text-primary transition-colors">Advanced Calculus</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-md">Chapter 4: Multivariable Integration</p>
+<div class="space-y-sm">
+<div class="flex justify-between text-label-sm font-label-sm text-on-surface-variant">
+<span class="">Progress</span>
+<span class="">65%</span>
+</div>
+<div class="w-full bg-surface-container h-[4px] rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+</div>
+<!-- Course Card 2 -->
+<div class="bg-surface rounded-xl p-md shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+<div class="w-full h-32 rounded-lg mb-md bg-cover bg-center overflow-hidden" data-alt="Vintage botanical illustrations mixed with modern molecular diagrams, soft greens and sepia tones, academic and scientific aesthetic." style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuCyF14OcNTSvNINvRwryFrrcuUieV235mwErmrzCbg_HZAJO3qOO6WYbch0G3E16A4zXI_lmJApUOx3mtfC2ARO5g-ycurnczfXWVXh3Q-hCkkbv1dF7E1iDgBRH9ZGi-ZaW8jjRrSfBbxjYtC27ajm6WFrZAjOUYyKK886rK6UFnUb-f4nXtRg7zoW61x15d_lqEvzbHKl-2QM6AxMNu4PE4nS7FpV1LzQGSywqeOfvUvhiuJZBnljRQ&quot;);">
+<div class="w-full h-full bg-gradient-to-t from-surface-inverse/80 to-transparent flex items-end p-sm">
+<span class="bg-surface-container/90 backdrop-blur-sm text-on-surface text-label-sm font-label-sm px-sm py-xs rounded">BIO 210</span>
+</div>
+</div>
+<h3 class="text-body-lg font-body-lg font-medium text-on-surface mb-xs group-hover:text-primary transition-colors">Cellular Biology</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-md">Module 2: Membrane Dynamics</p>
+<div class="space-y-sm">
+<div class="flex justify-between text-label-sm font-label-sm text-on-surface-variant">
+<span class="">Progress</span>
+<span class="">42%</span>
+</div>
+<div class="w-full bg-surface-container h-[4px] rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 42%;"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Activity -->
+<section class="bg-surface rounded-xl p-lg shadow-sm">
+<h2 class="text-headline-md font-headline-md text-on-surface mb-lg">Recent Activity</h2>
+<div class="relative pl-lg border-l-2 border-surface-container ml-sm space-y-lg">
+<!-- Activity Item -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">done_all</span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-sm">
+<div>
+<h4 class="text-body-md font-body-md text-on-surface font-medium">Submitted Assignment: Problem Set 3</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-xs">Advanced Calculus</p>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant whitespace-nowrap">2 hours ago</span>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">play_circle</span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-sm">
+<div>
+<h4 class="text-body-md font-body-md text-on-surface font-medium">Watched Lecture: Intro to Thermodynamics</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-xs">Physics 201</p>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant whitespace-nowrap">Yesterday</span>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">grade</span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-sm">
+<div>
+<h4 class="text-body-md font-body-md text-on-surface font-medium">Grade Received: 94% on Midterm</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-xs">Computer Science 101</p>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant whitespace-nowrap">Mon, Oct 12</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column (Sidebar) -->
+<div class="flex flex-col gap-lg">
+<!-- Tasks / Todos -->
+<section class="bg-surface rounded-xl p-lg shadow-sm flex flex-col h-full">
+<div class="flex justify-between items-center mb-md">
+<h2 class="text-headline-md font-headline-md text-on-surface">To-Do List</h2>
+<button class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-variant text-on-surface-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+<div class="flex flex-col gap-sm flex-1">
+<label class="flex items-start gap-md p-sm rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="mt-xs relative flex items-center justify-center">
+<input class="peer appearance-none w-5 h-5 border-2 border-outline rounded focus:ring-2 focus:ring-primary focus:ring-offset-2 checked:bg-primary checked:border-primary transition-all" type="checkbox">
+<span class="material-symbols-outlined absolute text-[16px] text-on-primary opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<div class="flex flex-col">
+<span class="text-body-md font-body-md text-on-surface group-hover:text-primary transition-colors">Read Chapter 5: Genetics</span>
+<span class="text-label-sm font-label-sm text-error mt-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-[12px]">schedule</span> Due Tomorrow
+                            </span>
+</div>
+</label>
+<label class="flex items-start gap-md p-sm rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="mt-xs relative flex items-center justify-center">
+<input class="peer appearance-none w-5 h-5 border-2 border-outline rounded focus:ring-2 focus:ring-primary focus:ring-offset-2 checked:bg-primary checked:border-primary transition-all" type="checkbox">
+<span class="material-symbols-outlined absolute text-[16px] text-on-primary opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<div class="flex flex-col">
+<span class="text-body-md font-body-md text-on-surface group-hover:text-primary transition-colors">Complete Lab Report</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant mt-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-[12px]">schedule</span> Due Friday
+                            </span>
+</div>
+</label>
+<label class="flex items-start gap-md p-sm rounded-lg hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="mt-xs relative flex items-center justify-center">
+<input class="peer appearance-none w-5 h-5 border-2 border-outline rounded focus:ring-2 focus:ring-primary focus:ring-offset-2 checked:bg-primary checked:border-primary transition-all" type="checkbox">
+<span class="material-symbols-outlined absolute text-[16px] text-on-primary opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<div class="flex flex-col">
+<span class="text-body-md font-body-md text-on-surface group-hover:text-primary transition-colors">Review Calculus Notes</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant mt-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-[12px]">schedule</span> No due date
+                            </span>
+</div>
+</label>
+</div>
+</section>
+<!-- Learning Goal Chart Placeholder -->
+<section class="bg-surface-container-low rounded-xl p-lg shadow-sm">
+<h2 class="text-label-md font-label-md text-on-surface-variant uppercase tracking-wider mb-md">Weekly Goal</h2>
+<div class="flex items-center justify-center relative w-32 h-32 mx-auto mb-md">
+<svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+<circle class="text-surface-variant" cx="50" cy="50" fill="transparent" r="45" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="50" cy="50" fill="transparent" r="45" stroke="currentColor" stroke-dasharray="282.7" stroke-dashoffset="70" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-headline-lg font-headline-lg text-on-surface leading-none">75%</span>
+</div>
+</div>
+<p class="text-body-sm font-body-sm text-center text-on-surface-variant">15/20 study hours completed this week.</p>
+</section>
+</div>
+</div>
+</div>
+<script>
+    // Simple script to toggle checkboxes visually if needed beyond CSS peer states
+    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            const textSpan = e.target.closest('label').querySelector('.text-body-md');
+            if (e.target.checked) {
+                textSpan.classList.add('line-through', 'opacity-50');
+            } else {
+                textSpan.classList.remove('line-through', 'opacity-50');
+            }
+        });
+    });
+</script></main><footer class="w-full py-xl px-lg mt-xl bg-surface-container-low"><div class="max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-center gap-md"><div class="flex items-center gap-xs"><img alt="Lumina Brand Logo" class="h-6 w-auto opacity-50" src="https://lh3.googleusercontent.com/aida/AEtjO1WsLlA-qblLCdvdhZmHZw8jOQBkdUvZAHi-soFyXBvkKE2TsMn-GZQmBusEwVPoxEQYAvCyn_CqDSluJ68-GW_twRhyK1F7-mcf0i93kTrtMwwYjuiN7d3UsTOUtSAt2EIfGQNDIT2Zb86RneFSp2jaCXXOtLMHpWZn8-Fs5SkVZauGcLbdrEYjAoLropVITjaubKQUIlM05L-BHw62cn5_vRZadX8VloW-LXf1O-03YiXzVbtRHoJv72mXHhSGIqP-PXhfWODIpeo"><span class="text-label-md font-label-md text-on-surface-variant">Lumina Learning Management</span></div><div class="flex gap-lg"><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Support</a></div></div></footer>
+
+</body></html>

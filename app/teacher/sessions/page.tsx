@@ -1,5 +1,6 @@
 "use client";
 
+import { ScheduleSession } from "@/components/session/ScheduleSession";
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,6 +41,7 @@ export default function TeacherSessionsPage() {
       headerSubtitle="Manage 1-on-1 scheduled classes and inspect past session duration reports"
     >
       <div className="max-w-6xl mx-auto space-y-6 pb-16">
+        <ScheduleSession />
         {/* Top Filter Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs">
           <div className="flex items-center gap-2">
@@ -63,16 +65,7 @@ export default function TeacherSessionsPage() {
             ))}
           </div>
 
-          <button
-            onClick={() => {
-              const newId = `sess-${Date.now()}`;
-              handleStartSession(newId);
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs transition-all"
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Start Ad-hoc 1:1 Session</span>
-          </button>
+
         </div>
 
         {/* Sessions List */}
@@ -143,18 +136,18 @@ export default function TeacherSessionsPage() {
 
                 {/* Right Action Buttons */}
                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                  {sess.status === "SCHEDULED" ? (
+                  {["SCHEDULED","LIVE"].includes(sess.status) ? (
                     <button
                       onClick={() => handleStartSession(sess.id)}
                       className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs transition-colors"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Start Classroom</span>
+                      <span>{sess.status === "LIVE" ? "Rejoin classroom" : "Start classroom"}</span>
                     </button>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/teacher/whiteboards?id=${sess.whiteboardId || "wb-live-math-rahul"}`}
+                        href={sess.whiteboardId ? `/teacher/whiteboards/${sess.whiteboardId}` : "/teacher/whiteboards"}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
                       >
                         <Layers className="w-3.5 h-3.5" />

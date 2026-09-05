@@ -37,50 +37,26 @@ export default function TeacherMarkingPage({ params }: PageProps) {
     updateWhiteboardElements,
   } = useLMS();
 
-  const assignment = assignments.find((a) => a.id === assignmentId) || assignments[0];
-  const student = students.find((s) => s.id === studentId) || students[0];
+  const assignment = assignments.find((a) => a.id === assignmentId);
+  const student = students.find((s) => s.id === studentId);
 
   const submission =
     submissions.find(
       (sub) => sub.assignmentId === assignmentId && sub.studentId === studentId
-    ) ||
-    submissions[0] || {
-      id: `subm-${Date.now()}`,
-      assignmentId,
-      assignmentTitle: assignment.title,
-      studentId,
-      studentName: student.name,
-      studentAvatar: student.avatar,
-      subject: assignment.subject,
-      submittedAt: new Date().toISOString(),
-      status: "SUBMITTED" as const,
-      score: 11,
-      maxScore: 12,
-      teacherFeedback: "Great work on factorisation!",
-      whiteboardId: "wb-rahul-math-hw",
-    };
-
-  const studentWhiteboard =
-    whiteboards.find((w) => w.id === submission.whiteboardId) ||
-    whiteboards.find((w) => w.studentId === studentId) ||
-    whiteboards[0];
+    );
+  const studentWhiteboard = whiteboards.find(w => w.id === submission?.whiteboardId);
 
   // Grading State
-  const [totalScore, setTotalScore] = useState<number>(submission.score || 11);
-  const [maxScore] = useState<number>(submission.maxScore || 12);
+  const [totalScore, setTotalScore] = useState<number>(submission?.score || 0);
+  const [maxScore] = useState<number>(submission?.maxScore || 0);
   const [feedback, setFeedback] = useState<string>(
-    submission.teacherFeedback ||
-      "Excellent problem layout on the canvas! For Question 3, make sure to state units for velocity and peak height."
+    submission?.teacherFeedback || ""
   );
 
   const [questionMarks, setQuestionMarks] = useState<
     Record<string, { status: "correct" | "incorrect" | "partial"; marks: number; comment?: string }>
   >(
-    submission.questionMarks || {
-      q1: { status: "correct", marks: 4, comment: "Precise factorisation!" },
-      q2: { status: "correct", marks: 3, comment: "Correct complex discriminant." },
-      q3: { status: "partial", marks: 4, comment: "Max height correct. Discard negative time root." },
-    }
+    submission?.questionMarks || {}
   );
 
   const handleSetQuestionStatus = (
@@ -101,9 +77,12 @@ export default function TeacherMarkingPage({ params }: PageProps) {
   };
 
   const handleSaveAndReturn = () => {
+    if (!submission || totalScore < 0 || totalScore > maxScore) return;
     gradeSubmission(submission.id, totalScore, feedback, questionMarks);
     router.push("/teacher/assignments");
   };
+
+  if (!assignment || !student || !submission) return <div className="p-10">No submission found for this student and assignment.</div>;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900 overflow-hidden font-sans select-none">
@@ -231,9 +210,9 @@ export default function TeacherMarkingPage({ params }: PageProps) {
               whiteboardId={studentWhiteboard?.id}
               roleLabel="Teacher"
               showTeacherTools={true}
-              onSave={(newElements) => {
+              onSave={(newElements, previousElements) => {
                 if (studentWhiteboard) {
-                  updateWhiteboardElements(studentWhiteboard.id, newElements);
+                  updateWhiteboardElements(studentWhiteboard.id, newElements, previousElements);
                 }
               }}
             />

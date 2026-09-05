@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 export default function TeacherReportsPage() {
-  const { sessionReports } = useLMS();
+  const { user, sessionReports } = useLMS();
 
   return (
     <AppShell
@@ -43,7 +43,7 @@ export default function TeacherReportsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Student: <strong className="text-slate-800">{rep.studentName}</strong> • Educator: <strong>Alex Thomas</strong>
+                      Student: <strong className="text-slate-800">{rep.studentName}</strong> • Educator: <strong>{user.name}</strong>
                     </p>
                   </div>
                 </div>

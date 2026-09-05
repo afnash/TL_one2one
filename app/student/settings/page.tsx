@@ -6,15 +6,16 @@ import { AppShell } from "@/components/layout/AppShell";
 import { User, Mail, Phone, CheckCircle2 } from "lucide-react";
 
 export default function StudentSettingsPage() {
-  const { user } = useLMS();
+  const { user, updateStudent } = useLMS();
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone || "+1 (555) 876-5432");
+  const [phone, setPhone] = useState(user.phone || "");
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    updateStudent(user.id, { name, email, phone });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -32,7 +33,7 @@ export default function StudentSettingsPage() {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">{user.name}</h3>
-              <p className="text-xs text-slate-500">Grade 11 Student</p>
+              <p className="text-xs text-slate-500">Student</p>
             </div>
           </div>
 
@@ -71,7 +72,7 @@ export default function StudentSettingsPage() {
               <label className="block text-xs font-bold text-slate-700 mb-1.5">Grade Level</label>
               <input
                 type="text"
-                value="Grade 11 STEM"
+                value="Managed by your teacher"
                 readOnly
                 className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700"
               />
@@ -81,7 +82,7 @@ export default function StudentSettingsPage() {
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
             {isSaved && (
               <span className="flex items-center gap-1 text-xs font-bold text-emerald-600">
-                <CheckCircle2 className="w-4 h-4" /> Changes saved successfully
+                <CheckCircle2 className="w-4 h-4" /> Changes queued for saving
               </span>
             )}
             <button

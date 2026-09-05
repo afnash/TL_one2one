@@ -1,5 +1,6 @@
 "use client";
 
+import { RosterManager } from "@/components/RosterManager";
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,9 +42,7 @@ export default function TeacherStudentsPage() {
   });
 
   const handleStartQuickSession = (studentId: string) => {
-    const sessId = `sess-${Date.now()}`;
-    startLiveSession(sessId);
-    router.push(`/teacher/session/${sessId}`);
+    router.push("/teacher/sessions");
   };
 
   return (
@@ -52,6 +51,7 @@ export default function TeacherStudentsPage() {
       headerSubtitle="Manage individual student profiles, curriculum progress, and personalized whiteboards"
     >
       <div className="max-w-6xl mx-auto space-y-6 pb-12">
+        <RosterManager kind="STUDENT" />
         {/* Top Control Bar: Search & Filters */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs">
           {/* Search Input */}

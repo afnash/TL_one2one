@@ -1,0 +1,7 @@
+"use client";
+import { useLMS } from "@/lib/store";
+export function BoardAccess({sessionId}:{sessionId:string}){
+ const {user,role,sessions,students,updateSession}=useLMS();const session=sessions.find(s=>s.id===sessionId);if(!session)return null;
+ const ids=session.studentIds||[session.studentId];const raised=session.raisedHands||[];const writers=session.writerIds||[];
+ return <div className="flex flex-wrap gap-3 items-center px-5 py-2 bg-slate-800 text-white text-xs">{session.meetingLink&&<a href={session.meetingLink} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg bg-indigo-600">Open video meeting</a>}{role==="STUDENT"?<><button className="border rounded-lg px-3 py-2" disabled={session.status!=="LIVE"} onClick={()=>updateSession(session.id,{raisedHands:raised.includes(user.id)?raised.filter(id=>id!==user.id):[...raised,user.id]})}>{raised.includes(user.id)?"Lower hand":"Raise hand to write"}</button><span>{ids.length===1||writers.includes(user.id)?"You can write on the board":"Watching ? your teacher can give you writing access"}</span></>:<>{ids.map(id=><div key={id} className="flex gap-2 items-center"><span>{students.find(s=>s.id===id)?.name||"Student"}{raised.includes(id)?" ?":""}</span><button className="border rounded-lg px-2 py-1" onClick={()=>updateSession(session.id,{writerIds:writers.includes(id)?writers.filter(w=>w!==id):[...writers,id],raisedHands:raised.filter(w=>w!==id)})}>{writers.includes(id)?"Revoke writing":"Allow writing"}</button></div>)}</>}</div>;
+}

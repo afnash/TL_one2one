@@ -28,54 +28,32 @@ export default function SessionReportPage({ params }: PageProps) {
   const sessionId = resolvedParams.id;
   const router = useRouter();
 
-  const { sessions, students, createSessionReport, updateStudent } = useLMS();
+  const { user, sessions, sessionReports, createSessionReport, updateStudent } = useLMS();
 
-  const currentSession = sessions.find((s) => s.id === sessionId) || {
-    id: sessionId,
-    studentId: "s1",
-    studentName: "Rahul Menon",
-    studentAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-    subject: "Mathematics",
-    topic: "Quadratic Equations — Roots & Factorisation",
-    actualStartTime: "04:00 PM",
-    actualEndTime: "04:52 PM",
-    durationMinutes: 52,
-    actualDurationSeconds: 3120,
-    date: new Date().toISOString().split("T")[0],
-  };
+  const currentSession = sessions.find((s) => s.id === sessionId);
+
+  const existingReport = sessionReports.find(r=>r.sessionId===sessionId);
 
   // Form State
   const [sessionDate, setSessionDate] = useState<string>(
-    currentSession.date || new Date().toISOString().split("T")[0]
+    existingReport?.date || currentSession?.date || ""
   );
-  const [startTime, setStartTime] = useState<string>(currentSession.actualStartTime || "04:00 PM");
-  const [endTime, setEndTime] = useState<string>(currentSession.actualEndTime || "04:52 PM");
+  const [startTime, setStartTime] = useState<string>(existingReport?.startTime || currentSession?.actualStartTime || "");
+  const [endTime, setEndTime] = useState<string>(existingReport?.endTime || currentSession?.actualEndTime || "");
   const [durationMinutes, setDurationMinutes] = useState<number>(
-    currentSession.durationMinutes || 52
+    existingReport?.durationMinutes || currentSession?.durationMinutes || 0
   );
 
   const [topicTaught, setTopicTaught] = useState<string>(
-    currentSession.topic || "Quadratic Equations & Roots"
+    existingReport?.topicTaught || currentSession?.topic || ""
   );
-  const [topicsCovered, setTopicsCovered] = useState<string[]>([
-    "Factorisation Method",
-    "Quadratic Formula Derivation",
-    "Real Roots Discriminant Analysis",
-  ]);
+  const [topicsCovered, setTopicsCovered] = useState<string[]>(existingReport?.topicsCovered || []);
   const [newTopicTag, setNewTopicTag] = useState<string>("");
-  const [assignmentGiven, setAssignmentGiven] = useState<string>(
-    "Complete questions 1–10 on Algebra Homework whiteboard"
-  );
-  const [rating, setRating] = useState<number>(5);
-  const [performanceNotes, setPerformanceNotes] = useState<string>(
-    "Rahul grasped the factorisation steps quickly and independently derived the discriminant conditions. Exceptional focus during interactive board calculations."
-  );
-  const [teacherNotes, setTeacherNotes] = useState<string>(
-    "Student is ready to transition to quadratic vertex equations and graph plotting."
-  );
-  const [nextSessionPlan, setNextSessionPlan] = useState<string>(
-    "Quadratic Graph Transformations & Vertex Forms"
-  );
+  const [assignmentGiven, setAssignmentGiven] = useState<string>(existingReport?.assignmentGiven || "");
+  const [rating, setRating] = useState<number>(existingReport?.studentPerformanceRating || 0);
+  const [performanceNotes, setPerformanceNotes] = useState<string>(existingReport?.studentPerformanceNotes || "");
+  const [teacherNotes, setTeacherNotes] = useState<string>(existingReport?.teacherNotes || "");
+  const [nextSessionPlan, setNextSessionPlan] = useState<string>(existingReport?.nextSessionPlan || "");
 
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
@@ -117,14 +95,15 @@ export default function SessionReportPage({ params }: PageProps) {
     setTopicsCovered(topicsCovered.filter((t) => t !== tag));
   };
 
-  const handleSaveReport = (exitAfter: boolean = false) => {
+  const handleSaveReport = (publish: boolean = false) => {
+    if (!currentSession) return;
     const newReport = createSessionReport({
       sessionId,
-      teacherId: "t1",
-      studentId: currentSession.studentId || "s1",
-      studentName: currentSession.studentName || "Rahul Menon",
+      teacherId: currentSession.teacherId || user.id,
+      studentId: currentSession.studentId,
+      studentName: currentSession.studentName,
       studentAvatar: currentSession.studentAvatar,
-      subject: currentSession.subject || "Mathematics",
+      subject: currentSession.subject,
       date: sessionDate,
       startTime,
       endTime,
@@ -137,6 +116,7 @@ export default function SessionReportPage({ params }: PageProps) {
       studentPerformanceNotes: performanceNotes,
       teacherNotes,
       nextSessionPlan,
+      status: publish ? "SAVED" : "DRAFT",
     });
 
     // Update student progress slightly
@@ -148,12 +128,16 @@ export default function SessionReportPage({ params }: PageProps) {
 
     setIsSaved(true);
 
-    if (exitAfter) {
+    if (publish) {
       setTimeout(() => {
         router.push("/teacher/sessions");
       }, 500);
     }
   };
+
+  if (!currentSession) {
+    return <AppShell><div className="py-20 text-center text-slate-500">Session not found.</div></AppShell>;
+  }
 
   return (
     <AppShell
@@ -468,7 +452,7 @@ export default function SessionReportPage({ params }: PageProps) {
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition-colors"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save Report</span>
+                <span>Save Draft</span>
               </button>
 
               <button
@@ -476,7 +460,7 @@ export default function SessionReportPage({ params }: PageProps) {
                 onClick={() => handleSaveReport(true)}
                 className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors"
               >
-                <span>Save & View Sessions</span>
+                <span>Save Report</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

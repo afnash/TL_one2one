@@ -88,7 +88,7 @@ export default function StudentAssignmentsPage() {
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900">{asg.title}</h3>
+                  <h3 className="text-base font-bold text-slate-900">{asg.kind === "HOMEWORK" ? "Homework: " : ""}{asg.title}</h3>
                   <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {asg.description}
                   </p>

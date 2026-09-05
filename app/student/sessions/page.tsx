@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
@@ -12,6 +12,8 @@ export default function StudentSessionsPage() {
   const router = useRouter();
   const { sessions, startLiveSession } = useLMS();
 
+  const [tab,setTab]=useState<"UPCOMING"|"PAST">("UPCOMING");
+  const filtered=sessions.filter(s=>tab==="UPCOMING"?["SCHEDULED","LIVE"].includes(s.status):["COMPLETED","CANCELLED"].includes(s.status));
   const handleJoin = (sessionId: string) => {
     startLiveSession(sessionId);
     router.push(`/student/session/${sessionId}`);
@@ -23,8 +25,10 @@ export default function StudentSessionsPage() {
       headerSubtitle="Upcoming scheduled classes with your educator and links to past class whiteboards"
     >
       <div className="max-w-6xl mx-auto space-y-6 pb-16">
+        <div className="flex gap-3">{(["UPCOMING","PAST"] as const).map(t=><button key={t} className={"border rounded-lg px-4 py-2 "+(t===tab?"bg-indigo-600 text-white":"bg-white")} onClick={()=>setTab(t)}>{t==="UPCOMING"?"Upcoming & live":"Past classes"}</button>)}</div>
+        {!filtered.length&&<p className="text-slate-500">No classes in this tab.</p>}
         <div className="space-y-4">
-          {sessions.map((sess) => (
+          {filtered.map((sess) => (
             <div
               key={sess.id}
               className="p-6 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
@@ -73,7 +77,7 @@ export default function StudentSessionsPage() {
               </div>
 
               <div>
-                {sess.status === "SCHEDULED" ? (
+                {["SCHEDULED","LIVE"].includes(sess.status) ? (
                   <button
                     onClick={() => handleJoin(sess.id)}
                     className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
@@ -83,7 +87,7 @@ export default function StudentSessionsPage() {
                   </button>
                 ) : (
                   <Link
-                    href={`/student/whiteboards?id=${sess.whiteboardId || "wb-live-math-rahul"}`}
+                    href={sess.whiteboardId ? `/student/whiteboards/${sess.whiteboardId}` : "/student/whiteboards"}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
                   >
                     <Layers className="w-3.5 h-3.5" />

@@ -1,5 +1,7 @@
 "use client";
 
+import { useRemoteCollection } from "./remote-collection";
+import { supabaseRequest } from "./supabase";
 import React, {
   createContext,
   useContext,
@@ -23,22 +25,17 @@ import {
   Notification,
   WhiteboardElement,
 } from "@/types";
-import {
-  mockUsers,
-  mockTeachers,
-  mockStudents,
-  mockSubjects,
-  mockSessions,
-  mockWhiteboards,
-  mockAssignments,
-  mockSubmissions,
-  mockMaterials,
-  mockSessionReports,
-  mockNotifications,
-} from "@/lib/mock-data";
 
 interface LMSContextType {
   role: UserRole;
+  directory: { teachers: Teacher[]; students: Student[] };
+  login: (role: "STUDENT" | "TEACHER", id: string) => Promise<void>;
+  createSession: (data: Omit<Session, "id">) => Session;
+  updateSession: (id: string, changes: Partial<Session>) => void;
+  deleteAssignment: (id: string) => void;
+  connectionError: string;
+  saving: boolean;
+  loading: boolean;
   user: User;
   switchRole: (newRole: UserRole) => void;
   teachers: Teacher[];
@@ -62,7 +59,7 @@ interface LMSContextType {
   // Whiteboard Operations
   getWhiteboardById: (id: string) => Whiteboard | undefined;
   saveWhiteboard: (whiteboard: Whiteboard) => void;
-  updateWhiteboardElements: (whiteboardId: string, elements: WhiteboardElement[]) => void;
+  updateWhiteboardElements: (whiteboardId: string, elements: WhiteboardElement[], previousElements?: WhiteboardElement[]) => void;
   createWhiteboard: (title: string, subject: string, category: Whiteboard["category"], studentId?: string) => Whiteboard;
   
   // Assignment Operations
@@ -97,72 +94,50 @@ interface LMSContextType {
 
 const LMSContext = createContext<LMSContextType | undefined>(undefined);
 
-const STORAGE_KEY = "onetoone_lms_state_v1";
+const STORAGE_KEY = "onetoone_identity";
+
+const EMPTY_USERS: Record<UserRole, User> = {
+  TEACHER: { id: "", name: "Teacher", email: "", avatar: "/icon.jpg", role: "TEACHER" },
+  STUDENT: { id: "", name: "Student", email: "", avatar: "/icon.jpg", role: "STUDENT" },
+  SUPERADMIN: { id: "", name: "Administrator", email: "", avatar: "/icon.jpg", role: "SUPERADMIN" },
+};
 
 export function LMSProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>("TEACHER");
-  const [teachers, setTeachers] = useState<Teacher[]>(mockTeachers);
-  const [students, setStudents] = useState<Student[]>(mockStudents);
-  const [subjects, setSubjects] = useState<Subject[]>(mockSubjects);
-  const [sessions, setSessions] = useState<Session[]>(mockSessions);
-  const [whiteboards, setWhiteboards] = useState<Whiteboard[]>(mockWhiteboards);
-  const [assignments, setAssignments] = useState<Assignment[]>(mockAssignments);
-  const [submissions, setSubmissions] = useState<Submission[]>(mockSubmissions);
-  const [materials, setMaterials] = useState<StudyMaterial[]>(mockMaterials);
-  const [sessionReports, setSessionReports] = useState<SessionReport[]>(mockSessionReports);
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [teachers, setTeachers, teachersSync] = useRemoteCollection<Teacher>("lms_teachers");
+  const [students, setStudents, studentsSync] = useRemoteCollection<Student>("lms_students");
+  const [subjects, setSubjects, subjectsSync] = useRemoteCollection<Subject>("lms_subjects");
+  const [sessions, setSessions, sessionsSync] = useRemoteCollection<Session>("lms_sessions");
+  const [whiteboards, setWhiteboards, whiteboardsSync] = useRemoteCollection<Whiteboard>("lms_whiteboards");
+  const [assignments, setAssignments, assignmentsSync] = useRemoteCollection<Assignment>("lms_assignments");
+  const [submissions, setSubmissions, submissionsSync] = useRemoteCollection<Submission>("lms_submissions");
+  const [materials, setMaterials, materialsSync] = useRemoteCollection<StudyMaterial>("lms_materials");
+  const [sessionReports, setSessionReports, sessionReportsSync] = useRemoteCollection<SessionReport>("lms_sessionreports");
+  const [notifications, setNotifications, notificationsSync] = useRemoteCollection<Notification>("lms_notifications");
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
 
-  // Load initial state from LocalStorage if available
+  const [identityId, setIdentityId] = useState("");
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.role) setRole(parsed.role);
-        if (parsed.sessions) setSessions(parsed.sessions);
-        if (parsed.whiteboards) setWhiteboards(parsed.whiteboards);
-        if (parsed.assignments) setAssignments(parsed.assignments);
-        if (parsed.submissions) setSubmissions(parsed.submissions);
-        if (parsed.sessionReports) setSessionReports(parsed.sessionReports);
-        if (parsed.materials) setMaterials(parsed.materials);
-        if (parsed.students) setStudents(parsed.students);
-        if (parsed.teachers) setTeachers(parsed.teachers);
-      }
-    } catch (e) {
-      console.warn("Could not load stored LMS state", e);
-    }
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) { try { const identity = JSON.parse(stored); setRole(identity.role); setIdentityId(identity.id); } catch { localStorage.removeItem(STORAGE_KEY); } }
+    setHasHydrated(true);
   }, []);
-
-  // Save changes to LocalStorage
-  const persistState = useCallback(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          role,
-          sessions,
-          whiteboards,
-          assignments,
-          submissions,
-          sessionReports,
-          materials,
-          students,
-          teachers,
-        })
-      );
-    } catch (e) {
-      console.warn("Failed to persist LMS state", e);
-    }
-  }, [role, sessions, whiteboards, assignments, submissions, sessionReports, materials, students, teachers]);
-
-  useEffect(() => {
-    persistState();
-  }, [persistState]);
+  const login = async (selectedRole: "STUDENT" | "TEACHER", id: string) => {
+    const person = (selectedRole === "TEACHER" ? teachers : students).find(p => p.id === id);
+    if (!person) throw new Error("Choose an existing profile or ask an administrator to create one.");
+    await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ id, data: { id, role: selectedRole, name: person.name, lastLoginAt: new Date().toISOString() } }) });
+    setRole(selectedRole); setIdentityId(id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: selectedRole, id }));
+  };
+  const syncStates = [teachersSync, studentsSync, subjectsSync, sessionsSync, whiteboardsSync, assignmentsSync, submissionsSync, materialsSync, sessionReportsSync, notificationsSync];
+  const connectionError = syncStates.find(s => s.error)?.error || "";
+  const loading = !hasHydrated || syncStates.some(s => s.loading);
+  const saving = syncStates.some(s => s.saving);
 
   // Live Timer Interval
   useEffect(() => {
@@ -177,20 +152,22 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [sessionStartTime]);
 
-  const user =
-    role === "TEACHER"
-      ? mockUsers.teacher
-      : role === "STUDENT"
-      ? mockUsers.student
-      : mockUsers.admin;
+  const user: User = role === "TEACHER"
+    ? teachers.find(t => t.id === identityId) ? { ...teachers.find(t => t.id === identityId)!, role: "TEACHER" } : EMPTY_USERS.TEACHER
+    : role === "STUDENT"
+      ? students.find(t => t.id === identityId) ? { ...students.find(t => t.id === identityId)!, role: "STUDENT" } : EMPTY_USERS.STUDENT
+      : EMPTY_USERS.SUPERADMIN;
 
   const switchRole = (newRole: UserRole) => {
-    setRole(newRole);
+    if (newRole === "SUPERADMIN") { setRole(newRole); return; }
+    window.location.href = "/login";
   };
 
   const startLiveSession = (sessionId: string) => {
     const sess = sessions.find((s) => s.id === sessionId);
-    const nowMs = Date.now();
+    if (!sess || sess.status === "COMPLETED" || sess.status === "CANCELLED") return;
+    if (role === "STUDENT" && sess.status !== "LIVE") return;
+    const nowMs = sess.startedAt ? Date.parse(sess.startedAt) : Date.now();
     setSessionStartTime(nowMs);
     setSessionElapsedSeconds(0);
     
@@ -198,38 +175,18 @@ export function LMSProvider({ children }: { children: ReactNode }) {
       const updated: Session = {
         ...sess,
         status: "LIVE",
+        startedAt: new Date(nowMs).toISOString(),
         actualStartTime: new Date(nowMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setActiveSession(updated);
-      setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
-    } else {
-      // Create ad-hoc live session
-      const newSess: Session = {
-        id: sessionId,
-        teacherId: "t1",
-        teacherName: "Alex Thomas",
-        teacherAvatar: mockUsers.teacher.avatar,
-        studentId: "s1",
-        studentName: "Rahul Menon",
-        studentAvatar: mockUsers.student.avatar,
-        subject: "Mathematics",
-        topic: "Live 1-on-1 Interactive Session",
-        date: new Date().toISOString().split("T")[0],
-        scheduledTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        durationMinutes: 60,
-        status: "LIVE",
-        whiteboardId: "wb-live-math-rahul",
-        actualStartTime: new Date(nowMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setActiveSession(newSess);
-      setSessions((prev) => [newSess, ...prev]);
+      if (role !== "STUDENT" && sess.status !== "LIVE") setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
     }
   };
 
   const endLiveSession = (sessionId: string) => {
     const endMs = Date.now();
-    const startMs = sessionStartTime || endMs - 3120000; // default to 52 mins if missing
-    const durationSeconds = Math.max(60, Math.floor((endMs - startMs) / 1000));
+    const startMs = sessionStartTime || endMs;
+    const durationSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
     const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
 
     const startTimeStr = new Date(startMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -263,7 +220,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   };
 
   const getWhiteboardById = (id: string) => {
-    return whiteboards.find((w) => w.id === id);
+    return visibleBoards.find((w) => w.id === id);
   };
 
   const saveWhiteboard = (wb: Whiteboard) => {
@@ -276,13 +233,13 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateWhiteboardElements = (whiteboardId: string, elements: WhiteboardElement[]) => {
+  const updateWhiteboardElements = (whiteboardId: string, elements: WhiteboardElement[], previousElements?: WhiteboardElement[]) => {
     setWhiteboards((prev) =>
       prev.map((wb) =>
         wb.id === whiteboardId
           ? { ...wb, elements, lastEdited: new Date().toISOString() }
           : wb
-      )
+      ), previousElements ? { [whiteboardId]: { elements: previousElements } } : undefined
     );
   };
 
@@ -290,17 +247,17 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     title: string,
     subject: string,
     category: Whiteboard["category"],
-    studentId: string = "s1"
+    studentId?: string
   ): Whiteboard => {
     const student = students.find((s) => s.id === studentId);
     const newBoard: Whiteboard = {
-      id: `wb-${Date.now()}`,
+      id: crypto.randomUUID(),
       title,
       subject,
       category,
-      studentId,
-      studentName: student?.name || "Rahul Menon",
-      teacherId: "t1",
+      studentId: student?.id,
+      studentName: student?.name,
+      teacherId: role === "TEACHER" ? user.id || undefined : student?.teacherId || undefined,
       lastEdited: new Date().toISOString(),
       elements: [],
     };
@@ -309,9 +266,16 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   };
 
   const createAssignment = (assignmentData: Omit<Assignment, "id" | "createdAt">): Assignment => {
-    const newId = `asg-${Date.now()}`;
+    const newId = crypto.randomUUID();
+    const teacherStudents = students.filter(s => s.teacherId === user.id);
+    const broadcastList = teacherStudents.length > 0 ? teacherStudents.map(s => s.id) : students.map(s => s.id);
+    const assignedStudentIds = assignmentData.targetType === "BROADCAST"
+      ? broadcastList
+      : (assignmentData.assignedStudentIds && assignmentData.assignedStudentIds.length > 0 ? assignmentData.assignedStudentIds : (students[0] ? [students[0].id] : []));
+
     const newAssignment: Assignment = {
       ...assignmentData,
+      assignedStudentIds,
       id: newId,
       createdAt: new Date().toISOString().split("T")[0],
       submissionsCount: 0,
@@ -321,16 +285,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     setAssignments((prev) => [newAssignment, ...prev]);
 
     // Send notification to assigned students
-    const targetStudents = assignmentData.targetType === "BROADCAST"
-      ? students.map((s) => s.id)
-      : assignmentData.assignedStudentIds;
-
-    const notifs: Notification[] = targetStudents.map((sId) => ({
+    const notifs: Notification[] = assignedStudentIds.map((sId) => ({
       id: `notif-${Date.now()}-${sId}`,
       userId: sId,
       targetRole: "STUDENT",
       title: "New Assignment Assigned",
-      message: `Alex Thomas posted '${newAssignment.title}' (${newAssignment.subject}). Due: ${newAssignment.dueDate}`,
+      message: `${user.name || "Teacher"} posted '${newAssignment.title}' (${newAssignment.subject}). Due: ${newAssignment.dueDate}`,
       timestamp: "Just now",
       read: false,
       type: "assignment",
@@ -348,15 +308,17 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     whiteboardId: string
   ): Submission => {
     const asg = assignments.find((a) => a.id === assignmentId);
-    const stud = students.find((s) => s.id === studentId) || mockStudents[0];
-    const totalMax = asg?.questions.reduce((acc, q) => acc + q.maxScore, 0) || 10;
+    const stud = students.find((s) => s.id === studentId);
+    if (!stud) throw new Error("Student not found");
+    if (!asg || !whiteboards.some(w=>w.id===whiteboardId && w.studentId===studentId)) throw new Error("Assignment board not found");
+    const totalMax = asg.questions.reduce((acc, q) => acc + q.maxScore, 0) || 10;
 
     const existingIdx = submissions.findIndex(
       (sub) => sub.assignmentId === assignmentId && sub.studentId === studentId
     );
 
     const submission: Submission = {
-      id: existingIdx >= 0 ? submissions[existingIdx].id : `subm-${Date.now()}`,
+      id: existingIdx >= 0 ? submissions[existingIdx].id : `${assignmentId}-${studentId}`,
       assignmentId,
       assignmentTitle: asg?.title || "Assignment",
       studentId,
@@ -381,7 +343,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => [
       {
         id: `notif-${Date.now()}`,
-        userId: "t1",
+          userId: asg?.teacherId || "",
         targetRole: "TEACHER",
         title: "Assignment Submitted",
         message: `${stud.name} submitted '${asg?.title}'. Ready for review.`,
@@ -402,6 +364,8 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     feedback: string,
     questionMarks?: Record<string, { status: "correct" | "incorrect" | "partial"; marks: number; comment?: string }>
   ) => {
+    const target = submissions.find(s=>s.id===submissionId);
+    if (!target || !Number.isFinite(score) || score < 0 || score > target.maxScore) return;
     setSubmissions((prev) =>
       prev.map((sub) =>
         sub.id === submissionId
@@ -424,7 +388,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
           userId: sub.studentId,
           targetRole: "STUDENT",
           title: "Assignment Graded & Feedback",
-          message: `Alex Thomas graded '${sub.assignmentTitle}'. Score: ${score}/${sub.maxScore}`,
+          message: `${user.name} graded '${sub.assignmentTitle}'. Score: ${score}/${sub.maxScore}`,
           timestamp: "Just now",
           read: false,
           type: "assignment",
@@ -438,13 +402,23 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   const createSessionReport = (
     reportData: Omit<SessionReport, "id" | "createdAt">
   ): SessionReport => {
+    const existingReport = sessionReports.find(r=>r.sessionId===reportData.sessionId);
     const newReport: SessionReport = {
       ...reportData,
-      id: `rep-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+      id: existingReport?.id || crypto.randomUUID(),
+      createdAt: existingReport?.createdAt || new Date().toISOString(),
     };
 
-    setSessionReports((prev) => [newReport, ...prev]);
+    setSessionReports((prev) => {
+      const existing = prev.find((report) => report.sessionId === reportData.sessionId);
+      return existing
+        ? prev.map((report) =>
+            report.sessionId === reportData.sessionId
+              ? { ...newReport, id: report.id, createdAt: report.createdAt }
+              : report
+          )
+        : [newReport, ...prev];
+    });
 
     // Update the session reference if exists
     setSessions((prev) =>
@@ -459,7 +433,8 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   ) => {
     const newMat: StudyMaterial = {
       ...mat,
-      id: `mat-${Date.now()}`,
+      teacherId: user.id,
+      id: crypto.randomUUID(),
       uploadDate: new Date().toISOString().split("T")[0],
       downloadsCount: 0,
     };
@@ -473,7 +448,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   const addStudent = (stud: Omit<Student, "id" | "joinedDate">) => {
     const newStud: Student = {
       ...stud,
-      id: `s-${Date.now()}`,
+      id: crypto.randomUUID(),
       joinedDate: new Date().toISOString().split("T")[0],
     };
     setStudents((prev) => [...prev, newStud]);
@@ -488,7 +463,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   const addTeacher = (teacherData: Omit<Teacher, "id" | "joinedDate" | "totalSessions">) => {
     const newTeacher: Teacher = {
       ...teacherData,
-      id: `t-${Date.now()}`,
+      id: crypto.randomUUID(),
       totalSessions: 0,
       joinedDate: new Date().toISOString().split("T")[0],
     };
@@ -511,22 +486,38 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const createSession = (data: Omit<Session, "id">): Session => {
+    const session = { ...data, id: crypto.randomUUID() };
+    const board = createWhiteboard(data.topic, data.subject, "LIVE_CLASS");
+    session.whiteboardId = board.id;
+    saveWhiteboard({ ...board, sessionId: session.id });
+    setSessions(previous => [...previous, session]);
+    return session;
+  };
+  const updateSession = (id: string, changes: Partial<Session>) => setSessions(previous => previous.map(s => s.id === id ? { ...s, ...changes } : s));
+  const deleteAssignment = (id: string) => setAssignments(previous => previous.filter(a => a.id !== id));
+  const myStudents = students.filter(s => s.teacherId === user.id);
+  const sessionVisible = (s: Session) => role === "SUPERADMIN" || (role === "TEACHER" ? s.teacherId === user.id : s.studentId === user.id || s.studentIds?.includes(user.id));
+  const assignmentVisible = (a: Assignment) => role === "SUPERADMIN" || (role === "TEACHER" ? a.teacherId === user.id : a.assignedStudentIds.includes(user.id));
+  const visibleAssignments = assignments.filter(assignmentVisible).map(a => ({ ...a, submissionsCount: submissions.filter(s => s.assignmentId === a.id).length, reviewedCount: submissions.filter(s => s.assignmentId === a.id && s.status === "REVIEWED").length }));
+  const visibleBoards = whiteboards.filter(w => role === "SUPERADMIN" || (role === "TEACHER" ? w.teacherId === user.id || myStudents.some(s => s.id === w.studentId) : w.studentId === user.id || sessions.some(s => s.whiteboardId === w.id && sessionVisible(s)) || assignments.some(a => a.whiteboardId === w.id && assignmentVisible(a))));
+  const subjectNames = Array.from(new Set([...teachers.flatMap(t => t.subjects), ...students.flatMap(s => s.subjects)])).filter(Boolean);
+
   return (
     <LMSContext.Provider
       value={{
-        role,
-        user,
-        switchRole,
-        teachers,
-        students,
-        subjects,
-        sessions,
-        whiteboards,
-        assignments,
-        submissions,
-        materials,
-        sessionReports,
-        notifications,
+        directory: { teachers, students },
+        role, user, switchRole, login, loading, saving, connectionError, createSession, updateSession, deleteAssignment,
+        teachers: teachers.map(t => ({ ...t, totalStudents: students.filter(s => s.teacherId === t.id).length, totalSessions: sessions.filter(s => s.teacherId === t.id && s.status === "COMPLETED").length })),
+        students: role === "TEACHER" ? (myStudents.length > 0 ? myStudents : students) : role === "STUDENT" ? students.filter(s => s.id === user.id) : students,
+        subjects: subjects.length ? subjects : subjectNames.map(name => ({ id: name, name, code: name.slice(0, 3), color: "#6366f1", icon: "book", description: "", studentCount: students.filter(s => s.subjects.includes(name)).length, topics: [] })),
+        sessions: sessions.filter(sessionVisible),
+        whiteboards: visibleBoards,
+        assignments: visibleAssignments,
+        submissions: submissions.filter(s => role === "SUPERADMIN" || (role === "STUDENT" ? s.studentId === user.id : visibleAssignments.some(a => a.id === s.assignmentId))),
+        materials: materials.filter(m => role === "SUPERADMIN" || (role === "TEACHER" ? m.teacherId === user.id : (m.assignedTo === "ALL" ? m.teacherId === students.find(s => s.id === user.id)?.teacherId : m.assignedTo.includes(user.id)))),
+        sessionReports: sessionReports.filter(r => role === "SUPERADMIN" || (role === "TEACHER" ? r.teacherId === user.id : r.studentId === user.id)),
+        notifications: notifications.filter(n => n.userId === user.id),
         activeSession,
         sessionStartTime,
         sessionElapsedSeconds,

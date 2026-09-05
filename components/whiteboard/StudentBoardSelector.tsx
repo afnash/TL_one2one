@@ -26,7 +26,7 @@ interface StudentBoardSelectorProps {
 export function StudentBoardSelector({
   currentWhiteboardId,
   onSelectBoard,
-  selectedStudentId = "s1",
+  selectedStudentId = "",
   onSelectStudent,
   isTeacherMode = false,
 }: StudentBoardSelectorProps) {
@@ -34,7 +34,7 @@ export function StudentBoardSelector({
 
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isBoardDropdownOpen, setIsBoardDropdownOpen] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState<string>("Mathematics");
+  const [selectedSubject, setSelectedSubject] = useState<string>("");
 
   const currentStudent = students.find((s) => s.id === selectedStudentId) || students[0];
   const currentBoard = whiteboards.find((w) => w.id === currentWhiteboardId) || whiteboards[0];
@@ -42,13 +42,13 @@ export function StudentBoardSelector({
   // Filter boards for the selected student and subject
   const studentBoards = whiteboards.filter(
     (w) =>
-      (!w.studentId || w.studentId === selectedStudentId) &&
+      (!w.studentId || w.studentId === (selectedStudentId || currentStudent?.id)) &&
       (!selectedSubject || w.subject === selectedSubject)
   );
 
   const handleCreateNewBoard = (category: "PRACTICE" | "MY_WORK" | "LIVE_CLASS") => {
     const title = `${selectedSubject} — ${category === "PRACTICE" ? "Practice" : category === "MY_WORK" ? "Scratchpad" : "Live Session"} (${new Date().toLocaleDateString()})`;
-    const newBoard = createWhiteboard(title, selectedSubject, category, selectedStudentId);
+    const newBoard = createWhiteboard(title, selectedSubject || currentStudent?.subjects[0] || "General", category, selectedStudentId || currentStudent?.id);
     onSelectBoard(newBoard.id);
     setIsBoardDropdownOpen(false);
   };
@@ -56,7 +56,7 @@ export function StudentBoardSelector({
   return (
     <div className="flex flex-wrap items-center gap-2 p-1 bg-white border border-slate-200/90 rounded-xl shadow-2xs">
       {/* Teacher Student Switcher Dropdown */}
-      {isTeacherMode && (
+      {isTeacherMode && currentStudent && (
         <div className="relative">
           <button
             onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}

@@ -6,16 +6,17 @@ import { AppShell } from "@/components/layout/AppShell";
 import { User, Mail, Phone, Globe, Bell, Lock, CheckCircle2 } from "lucide-react";
 
 export default function TeacherSettingsPage() {
-  const { user } = useLMS();
+  const { user, updateTeacher } = useLMS();
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone || "+1 (555) 234-5678");
+  const [phone, setPhone] = useState(user.phone || "");
   const [bio, setBio] = useState(user.bio || "");
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    updateTeacher(user.id, { name, email, phone, bio });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };

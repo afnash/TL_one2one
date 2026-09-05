@@ -77,7 +77,7 @@ export default function TeacherAssignmentsPage() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-slate-900">{asg.title}</h3>
+                      <h3 className="text-base font-bold text-slate-900">{asg.kind === "HOMEWORK" ? "Homework: " : ""}{asg.title}</h3>
                       <span className="px-2.5 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded-full">
                         {asg.subject}
                       </span>

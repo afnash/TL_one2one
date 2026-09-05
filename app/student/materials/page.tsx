@@ -1,5 +1,6 @@
 "use client";
 
+import { safeResourceUrl } from "@/lib/supabase";
 import React, { useState } from "react";
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
@@ -86,7 +87,7 @@ export default function StudentMaterialsPage() {
                 </span>
 
                 <button
-                  onClick={() => alert(`Downloading "${m.title}"`)}
+                  onClick={() => window.open(safeResourceUrl(m.url), "_blank", "noopener,noreferrer")}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />

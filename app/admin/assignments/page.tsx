@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { BookOpen, Calendar, Users } from "lucide-react";
 
 export default function AdminAssignmentsPage() {
-  const { assignments, submissions } = useLMS();
+  const { assignments, submissions, deleteAssignment } = useLMS();
 
   return (
     <AppShell
@@ -35,7 +35,7 @@ export default function AdminAssignmentsPage() {
                     </p>
                   </div>
                   <span className="text-xs font-bold px-3 py-1 bg-slate-100 rounded-xl text-slate-700">
-                    {subs.length} Submissions
+                    {subs.length} Submissions <button onClick={()=>{if(confirm("Remove this assignment from the dashboard?"))deleteAssignment(asg.id);}} className="ml-3 text-red-600">Remove</button>
                   </span>
                 </div>
               </div>

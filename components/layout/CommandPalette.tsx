@@ -127,14 +127,14 @@ export function CommandPalette() {
                 {role === "TEACHER" ? (
                   <>
                     <button
-                      onClick={() => handleNavigate("/teacher/session/sess-101")}
+                      onClick={() => handleNavigate("/teacher/sessions")}
                       className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
                     >
                       <div className="p-1.5 rounded-md bg-indigo-100 text-indigo-700">
                         <Video className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900">Start Session with Rahul</p>
+                        <p className="font-semibold text-slate-900">Open live sessions</p>
                         <p className="text-[11px] text-slate-500">Live 1-to-1 Classroom</p>
                       </div>
                     </button>
@@ -154,7 +154,7 @@ export function CommandPalette() {
                 ) : (
                   <>
                     <button
-                      onClick={() => handleNavigate("/student/session/sess-101")}
+                      onClick={() => handleNavigate("/student/sessions")}
                       className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
                     >
                       <div className="p-1.5 rounded-md bg-indigo-100 text-indigo-700">
@@ -162,7 +162,7 @@ export function CommandPalette() {
                       </div>
                       <div>
                         <p className="font-semibold text-slate-900">Join Live Class</p>
-                        <p className="text-[11px] text-slate-500">Mathematics with Alex</p>
+                        <p className="text-[11px] text-slate-500">Your scheduled classes</p>
                       </div>
                     </button>
                     <button

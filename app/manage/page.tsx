@@ -1,0 +1,8 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useLMS } from "@/lib/store";
+export default function ManageLogin() {
+ const router = useRouter(); const { switchRole } = useLMS(); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
+ return <main className="min-h-screen grid place-items-center p-6 bg-slate-50"><form className="bg-white border rounded-2xl p-8 w-full max-w-md space-y-5" onSubmit={async e=>{ e.preventDefault();setBusy(true);setError(""); const form=new FormData(e.currentTarget);try { const r=await fetch("/api/manage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.fromEntries(form))}); const result=await r.json(); if(!r.ok)throw new Error(result.error);switchRole("SUPERADMIN");router.push("/admin/dashboard");router.refresh();}catch(e){setError(e instanceof Error?e.message:"Login failed");}finally{setBusy(false);} }}><h1 className="text-2xl font-bold">Manage OneToOne</h1><label className="block">Username<input name="username" required autoComplete="username" className="block border rounded-lg p-3 w-full"/></label><label className="block">Password<input name="password" type="password" required autoComplete="current-password" className="block border rounded-lg p-3 w-full"/></label>{error&&<p role="alert" className="text-red-600">{error}</p>}<button disabled={busy} className="rounded-lg p-3 bg-indigo-600 text-white w-full">{busy?"Signing in?":"Sign in"}</button><a href="/login" className="block text-sm text-indigo-600">Student / teacher access</a></form></main>;
+}

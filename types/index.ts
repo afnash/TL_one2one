@@ -13,6 +13,8 @@ export interface User {
 }
 
 export interface Teacher {
+  phone?: string;
+  bio?: string;
   id: string;
   name: string;
   email: string;
@@ -26,6 +28,7 @@ export interface Teacher {
 }
 
 export interface Student {
+  phone?: string;
   id: string;
   name: string;
   email: string;
@@ -59,6 +62,10 @@ export interface Subject {
 export type SessionStatus = "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED";
 
 export interface Session {
+  studentIds?: string[];
+  startedAt?: string;
+  raisedHands?: string[];
+  writerIds?: string[];
   id: string;
   teacherId: string;
   teacherName: string;
@@ -151,6 +158,7 @@ export interface Question {
 }
 
 export interface Assignment {
+  kind?: "ASSIGNMENT" | "HOMEWORK";
   id: string;
   title: string;
   subject: string;
@@ -195,6 +203,8 @@ export interface Submission {
 }
 
 export interface StudyMaterial {
+  teacherId?: string;
+  sizeBytes?: number;
   id: string;
   title: string;
   subject: string;
@@ -227,6 +237,7 @@ export interface SessionReport {
   studentPerformanceNotes: string;
   teacherNotes: string;
   nextSessionPlan: string;
+  status?: "DRAFT" | "SAVED";
   createdAt: string;
 }
 

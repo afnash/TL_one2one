@@ -1,0 +1,198 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={theme:{extend:{"colors":{"on-surface":"#0b1c30","on-secondary-fixed-variant":"#005236","on-primary-fixed-variant":"#2f2ebe","surface-dim":"#cbdbf5","on-background":"#0b1c30","surface-container":"#e5eeff","inverse-surface":"#213145","background":"#f8f9ff","primary-fixed":"#e1e0ff","surface":"#f8f9ff","on-secondary-container":"#00714d","inverse-on-surface":"#eaf1ff","tertiary":"#825100","surface-variant":"#d3e4fe","primary":"#4648d4","surface-container-high":"#dce9ff","surface-bright":"#f8f9ff","secondary-container":"#6cf8bb","outline":"#767586","secondary":"#006c49","tertiary-container":"#a36700","error-container":"#ffdad6","on-tertiary-fixed-variant":"#653e00","on-tertiary":"#ffffff","inverse-primary":"#c0c1ff","on-primary-fixed":"#07006c","surface-container-lowest":"#ffffff","on-secondary":"#ffffff","primary-container":"#6063ee","secondary-fixed-dim":"#4edea3","on-surface-variant":"#464554","on-error":"#ffffff","on-tertiary-fixed":"#2a1700","on-secondary-fixed":"#002113","surface-container-highest":"#d3e4fe","on-error-container":"#93000a","secondary-fixed":"#6ffbbe","error":"#ba1a1a","tertiary-fixed-dim":"#ffb95f","on-primary":"#ffffff","outline-variant":"#c7c4d7","tertiary-fixed":"#ffddb8","on-tertiary-container":"#fffbff","surface-container-low":"#eff4ff","on-primary-container":"#fffbff","surface-tint":"#494bd6","primary-fixed-dim":"#c0c1ff"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"md":"16px","sm":"8px","unit":"4px","xl":"40px","lg":"24px","xs":"4px","container-max":"1200px","gutter":"20px"},"fontFamily":{"headline-md":["Geist"],"body-lg":["Inter"],"body-md":["Inter"],"label-md":["Geist"],"display-lg":["Geist"],"label-sm":["Geist"],"body-sm":["Inter"],"headline-lg":["Geist"]},"fontSize":{"headline-md":["24px",{"lineHeight":"1.3","fontWeight":"600"}],"body-lg":["18px",{"lineHeight":"1.6","fontWeight":"400"}],"body-md":["16px",{"lineHeight":"1.5","fontWeight":"400"}],"label-md":["14px",{"lineHeight":"1","fontWeight":"500"}],"display-lg":["48px",{"lineHeight":"1.1","letterSpacing":"-0.02em","fontWeight":"700"}],"label-sm":["12px",{"lineHeight":"1","letterSpacing":"0.02em","fontWeight":"500"}],"body-sm":["14px",{"lineHeight":"1.5","fontWeight":"400"}],"headline-lg":["32px",{"lineHeight":"1.2","letterSpacing":"-0.02em","fontWeight":"600"}]}}}}</script><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-background font-body-md text-on-background"><header class="fixed top-spacing-md left-spacing-md right-spacing-md h-20 bg-surface/60 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex items-center justify-between px-lg rounded-xl"><div class="flex items-center gap-sm"><img alt="Lumina Brand Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqf_lv2Oxm_kI8hKerDf_WWVmPChr7-kirNADeiKxMJYW4mc_BzEA4kRXO-ohXsibH3arJaLeJPa1xBN3Nuh57tnSu6GqY5P0KIVmIBQuBhC0dybYP2zuHlQ6Ua5Ko-ScmgS54vNEvz70XurygodhXft0Pclc8PkGI2keXFvmZmRA5PeyErSH_iqyrDCFz9yt_SirTgkjWk-zkOwqTUyV3aCOE85B7AhyXxl5-06oZ7Cibwr_9tmNN1Q"></div><nav class="hidden md:flex items-center gap-xl" data-active-classes="text-primary font-bold underline underline-offset-8 decoration-2"><a aria-current="page" class="transition-colors text-primary font-bold underline underline-offset-8 decoration-2" data-path="student-home" href="#">Home</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-sessions" href="#">Sessions</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-materials" href="#">Materials</a><a class="text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="student-progress" href="#">Progress</a></nav><div class="flex items-center gap-md"><span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-xs rounded-full hover:bg-surface-container">notifications</span><img alt="Profile" class="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-primary-fixed" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8tTMI1XkhTnZRgDBKIy6Hlt3A_JeolOLX9Wnez955fQMwwd-gn_-VpMAZexx5lrtUJK-h1xZUEWSBD9Ofd3YWxjga8isBjSsnKK4osnOvUCZoXXeQN61I14jKuPVGS1lV8rT8-xBaDsd815SrgO3pL9pS2m_I_xPPmRe0B8M4h25ePIOWXzAuIqJ5-wSzsIw1DnrFbN0NTLeMqeWBIf22YG0iqt34CHp3oWZuEhvSKxH9Yh_JqDjd0A"></div></header><main class="w-full pt-28 px-spacing-md bg-background"><div class="flex flex-col w-full gap-lg">
+<!-- Header Section -->
+<header class="pt-xl pb-md px-lg">
+<h1 class="font-display-lg text-display-lg text-on-background mb-sm">
+      Good afternoon, Rahul.
+    </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+      Here's what's waiting for you today.
+    </p>
+</header>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg px-lg">
+<!-- Left Column (Primary Actions & Feedback) -->
+<div class="lg:col-span-8 flex flex-col gap-lg">
+<!-- Hero Card: Next Class -->
+<section class="relative bg-primary text-on-primary rounded-xl overflow-hidden shadow-md group p-xl flex flex-col justify-between min-h-[320px]">
+<!-- Background Decoration (Glassmorphic) -->
+<div class="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
+<div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-2xl -mr-16 -mt-16 transition-transform duration-700 group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="inline-flex items-center gap-xs bg-black/20 backdrop-blur-md px-md py-xs rounded-full mb-lg">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-primary">Next Class</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg mb-sm">Mathematics: Quadratic Equations</h2>
+<div class="flex items-center gap-md font-body-md text-body-md text-on-primary/80">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">person</span>
+<span class="">Alex Thomas</span>
+</div>
+<span class="w-1 h-1 bg-on-primary/50 rounded-full"></span>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="">Today, 4:00 PM</span>
+</div>
+</div>
+</div>
+<div class="relative z-10 mt-xl self-start">
+<button class="bg-surface text-primary font-label-md text-label-md px-lg py-md rounded-lg shadow-sm hover:bg-surface-container-low hover:shadow-md transition-all active:scale-95 flex items-center gap-sm">
+<span class="">Join Class</span>
+<span class="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
+</button>
+</div>
+</section>
+<!-- Secondary Action Cards Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-3 gap-md">
+<!-- Card 1 -->
+<a class="bg-surface-container rounded-xl p-md group hover:bg-surface-container-high hover:shadow-sm transition-all flex flex-col items-start gap-md" href="#">
+<div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">assignment</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-xs">Assignments</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-bold text-error">3</span> pending tasks</p>
+</div>
+</a>
+<!-- Card 2 -->
+<a class="bg-surface-container rounded-xl p-md group hover:bg-surface-container-high hover:shadow-sm transition-all flex flex-col items-start gap-md" href="#">
+<div class="w-10 h-10 rounded-full bg-secondary/10 text-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">draw</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-xs">Whiteboards</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Continue working</p>
+</div>
+</a>
+<!-- Card 3 -->
+<a class="bg-surface-container rounded-xl p-md group hover:bg-surface-container-high hover:shadow-sm transition-all flex flex-col items-start gap-md" href="#">
+<div class="w-10 h-10 rounded-full bg-tertiary/10 text-tertiary flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">folder_open</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-xs">Materials</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-bold text-primary">2</span> new added</p>
+</div>
+</a>
+</section>
+<!-- Recent Teacher Feedback -->
+<section class="bg-surface-container-lowest rounded-xl p-lg shadow-sm">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">forum</span>
+          Recent Feedback
+        </h3>
+<div class="flex items-start gap-md">
+<img class="w-12 h-12 rounded-full object-cover shadow-sm bg-surface-container" data-alt="Professional headshot of a middle-aged male teacher with glasses, smiling, wearing a light blue collared shirt, well-lit studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcqjjANk6rt3Fxg41mj9bhVxD5vafhgwplI-jVzY_0jyV9IRdN18BDAYDYTXXWt_LZZK0EYP7dqKn9yjFjMHYZ0uZ59g6rgQLwCIy2m6P3nSggUq-hAA06zbrJsGle2DWIwDjdXu1yde0kEP5Ts5yRfTqM575AcvKe2I59ershI95ZupuYHo4g-_fd0NZqP_vZX5OR-4-Spc4xUbY0CDf6Se0Zg3IuJh2LURJKIxL7t2XwXq95k8lZKw">
+<div class="flex-1 bg-surface-container p-md rounded-r-xl rounded-bl-xl relative">
+<div class="absolute -left-2 top-4 w-4 h-4 bg-surface-container rotate-45"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-baseline mb-xs">
+<h4 class="font-label-md text-label-md text-on-surface font-bold">Alex Thomas</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant italic">
+                "Great work on factorisation in the last assignment. You've got the basics down perfectly. Review Q4 again when you have a moment, just a small sign error there."
+              </p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column (Progress & Assignments) -->
+<div class="lg:col-span-4 flex flex-col gap-lg">
+<!-- Subject Progress -->
+<section class="bg-surface-container-lowest rounded-xl p-lg shadow-sm">
+<div class="flex justify-between items-center mb-md">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Subject Progress</h3>
+<button class="text-primary hover:bg-primary/10 p-xs rounded-full transition-colors">
+<span class="material-symbols-outlined text-[20px]">trending_up</span>
+</button>
+</div>
+<div class="flex flex-col gap-md">
+<!-- Progress Item: Maths -->
+<div>
+<div class="flex justify-between font-label-md text-label-md mb-xs">
+<span class="text-on-surface">Mathematics</span>
+<span class="text-on-surface-variant">72%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 72%;"></div>
+</div>
+</div>
+<!-- Progress Item: Physics -->
+<div>
+<div class="flex justify-between font-label-md text-label-md mb-xs">
+<span class="text-on-surface">Physics</span>
+<span class="text-on-surface-variant">65%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+<!-- Progress Item: Chemistry -->
+<div>
+<div class="flex justify-between font-label-md text-label-md mb-xs">
+<span class="text-on-surface">Chemistry</span>
+<span class="text-on-surface-variant">88%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-tertiary rounded-full" style="width: 88%;"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Upcoming Assignments -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col flex-1">
+<div class="p-lg pb-sm border-b border-surface-container-high/50 flex justify-between items-center">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Upcoming</h3>
+<a class="font-label-sm text-label-sm text-primary hover:underline" href="#">View All</a>
+</div>
+<div class="flex flex-col p-sm">
+<!-- Assignment Item -->
+<a class="p-md hover:bg-surface-container rounded-lg transition-colors group flex items-start gap-md" href="#">
+<div class="w-8 h-8 rounded bg-error-container text-on-error-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold">priority_high</span>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-body-md text-body-md text-on-surface truncate group-hover:text-primary transition-colors">Algebra Worksheet 4</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Mathematics</p>
+</div>
+<div class="text-right shrink-0">
+<span class="font-label-sm text-label-sm text-error block">Today</span>
+</div>
+</a>
+<!-- Assignment Item -->
+<a class="p-md hover:bg-surface-container rounded-lg transition-colors group flex items-start gap-md" href="#">
+<div class="w-8 h-8 rounded bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-body-md text-body-md text-on-surface truncate group-hover:text-primary transition-colors">Lab Report: Kinematics</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Physics</p>
+</div>
+<div class="text-right shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Tomorrow</span>
+</div>
+</a>
+<!-- Assignment Item -->
+<a class="p-md hover:bg-surface-container rounded-lg transition-colors group flex items-start gap-md" href="#">
+<div class="w-8 h-8 rounded bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-body-md text-body-md text-on-surface truncate group-hover:text-primary transition-colors">Read Chapter 3</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">History</p>
+</div>
+<div class="text-right shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Wed, 24th</span>
+</div>
+</a>
+</div>
+</section>
+</div>
+</div>
+</div></main><footer class="w-full py-xl px-lg mt-xl bg-surface-container-low"><div class="max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-center gap-md"><div class="flex items-center gap-xs"><img alt="Lumina Brand Logo" class="h-6 w-auto opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqf_lv2Oxm_kI8hKerDf_WWVmPChr7-kirNADeiKxMJYW4mc_BzEA4kRXO-ohXsibH3arJaLeJPa1xBN3Nuh57tnSu6GqY5P0KIVmIBQuBhC0dybYP2zuHlQ6Ua5Ko-ScmgS54vNEvz70XurygodhXft0Pclc8PkGI2keXFvmZmRA5PeyErSH_iqyrDCFz9yt_SirTgkjWk-zkOwqTUyV3aCOE85B7AhyXxl5-06oZ7Cibwr_9tmNN1Q"><span class="text-label-md font-label-md text-on-surface-variant">Lumina Learning Management</span></div><div class="flex gap-lg"><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a><a class="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Support</a></div></div></footer>
+
+</body></html>

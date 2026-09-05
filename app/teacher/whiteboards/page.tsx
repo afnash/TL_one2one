@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
 export default function TeacherWhiteboardsPage() {
   const { whiteboards, students, updateWhiteboardElements } = useLMS();
 
-  const [activeBoardId, setActiveBoardId] = useState<string>("wb-live-math-rahul");
-  const [selectedStudentId, setSelectedStudentId] = useState<string>("s1");
+  const [activeBoardId, setActiveBoardId] = useState<string>("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
   const currentBoard =
     whiteboards.find((w) => w.id === activeBoardId) || whiteboards[0];
@@ -51,13 +51,14 @@ export default function TeacherWhiteboardsPage() {
         {/* Interactive Infinite Whiteboard */}
         <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs">
           <WhiteboardCanvas
-            key={activeBoardId}
+            key={currentBoard?.id}
             initialWhiteboard={currentBoard}
-            whiteboardId={activeBoardId}
+            whiteboardId={currentBoard?.id}
             roleLabel="Teacher"
             showTeacherTools={true}
-            onSave={(newElements) => {
-              updateWhiteboardElements(activeBoardId, newElements);
+            readOnly={!currentBoard}
+            onSave={(newElements, previousElements) => {
+              updateWhiteboardElements(currentBoard?.id || "", newElements, previousElements);
             }}
           />
         </div>

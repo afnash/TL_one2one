@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  const { user, sessions, students, assignments, submissions, startLiveSession } = useLMS();
+  const { user, sessions, students, assignments, submissions, materials, startLiveSession } = useLMS();
 
   // Upcoming sessions
   const upcomingSessions = sessions.filter((s) => s.status === "SCHEDULED");
@@ -51,7 +51,7 @@ export default function TeacherDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Card 1: Start Live Session */}
             <div
-              onClick={() => handleStartSession("sess-101")}
+              onClick={() => upcomingSessions[0] ? handleStartSession(upcomingSessions[0].id) : router.push("/teacher/sessions")}
               className="group relative p-6 bg-gradient-to-br from-indigo-50/90 via-white to-white rounded-2xl border-2 border-indigo-200/80 hover:border-indigo-500 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             >
               <div className="space-y-3">
@@ -68,7 +68,7 @@ export default function TeacherDashboard() {
                 </div>
               </div>
               <div className="pt-5 flex items-center justify-between text-xs font-bold text-indigo-600 border-t border-indigo-100/60 mt-4">
-                <span>Start Session with Rahul</span>
+                <span>{upcomingSessions[0] ? "Start session with " + upcomingSessions[0].studentName : "Schedule a class"}</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -322,9 +322,9 @@ export default function TeacherDashboard() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-slate-800">
-                  Rahul Menon submitted <strong>Quadratic Equations Mastery</strong>
+                  {submissions[0] ? <>{submissions[0].studentName} submitted <strong>{submissions[0].assignmentTitle}</strong></> : "No recent submissions"}
                 </p>
-                <p className="text-[11px] text-slate-400">Mathematics • 10 mins ago</p>
+                <p className="text-[11px] text-slate-400">{submissions[0] ? submissions[0].subject + " ? " + new Date(submissions[0].submittedAt).toLocaleString() : ""}</p>
               </div>
               <Link
                 href="/teacher/assignments"
@@ -340,9 +340,9 @@ export default function TeacherDashboard() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-slate-800">
-                  Session report completed for <strong>Arjun Kumar</strong> (52 mins)
+                  {recentCompletedSessions[0] ? <>Session completed for <strong>{recentCompletedSessions[0].studentName}</strong> ({recentCompletedSessions[0].durationMinutes} mins)</> : "No recently completed sessions"}
                 </p>
-                <p className="text-[11px] text-slate-400">Calculus Integration • Yesterday</p>
+                <p className="text-[11px] text-slate-400">{recentCompletedSessions[0]?.topic} {recentCompletedSessions[0]?.date}</p>
               </div>
               <Link
                 href="/teacher/reports"
@@ -358,9 +358,9 @@ export default function TeacherDashboard() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-slate-800">
-                  Uploaded new resource: <strong>Quadratic Functions & Parabola Properties</strong>
+                  {materials[0] ? "Resource: " + materials[0].title : "No resources uploaded yet"}
                 </p>
-                <p className="text-[11px] text-slate-400">PDF • 2.4 MB • 3 days ago</p>
+                <p className="text-[11px] text-slate-400">{materials[0]?.size} {materials[0]?.uploadDate}</p>
               </div>
             </div>
           </div>

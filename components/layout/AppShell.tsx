@@ -4,6 +4,9 @@ import React, { useState, ReactNode } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { CommandPalette } from "./CommandPalette";
+import { useLMS } from "@/lib/store";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 interface AppShellProps {
@@ -19,13 +22,16 @@ export function AppShell({
   headerSubtitle,
   hideSidebar = false,
 }: AppShellProps) {
+  const { loading, saving, connectionError, role, user, switchRole } = useLMS();
+  const pathname = usePathname(); const router = useRouter();
+  useEffect(() => { if(pathname.startsWith("/admin/")) switchRole("SUPERADMIN"); else if(!loading && (!user.id || !pathname.startsWith("/"+role.toLowerCase()+"/"))) router.replace("/login"); }, [loading, pathname, user.id, role]);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-[#fbfbfd] text-slate-900 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-[#f8f9ff] text-[#0b1c30] overflow-hidden font-sans md:pr-4 md:gap-10">
       {/* Desktop Sidebar */}
       {!hideSidebar && (
-        <div className="hidden md:flex h-full shrink-0">
+        <div className="hidden md:flex h-full w-72 shrink-0">
           <AppSidebar />
         </div>
       )}
@@ -47,14 +53,16 @@ export function AppShell({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col gap-4 min-w-0 h-full overflow-hidden">
         <AppHeader
           title={headerTitle}
           subtitle={headerSubtitle}
           onOpenMobileMenu={() => setMobileDrawerOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          {children}
+        <main className="flex-1 overflow-y-auto p-4 md:px-0 md:py-6">
+          {connectionError && <div role="alert" className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm">{connectionError} <button onClick={()=>window.location.reload()} className="underline">Reload</button></div>}
+          {saving && <p role="status" className="text-xs text-indigo-600 mb-3">Saving to Supabase?</p>}
+          {loading ? <p className="p-8 text-slate-500">Loading workspace?</p> : children}
         </main>
       </div>
 

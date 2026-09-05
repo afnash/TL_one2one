@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadMaterial, safeResourceUrl } from "@/lib/supabase";
 import React, { useState } from "react";
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
@@ -26,31 +27,40 @@ export default function TeacherMaterialsPage() {
 
   // New material form
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("Mathematics");
+  const [subject, setSubject] = useState(subjects[0]?.name || "");
   const [type, setType] = useState<StudyMaterial["type"]>("PDF");
+  const [resourceUrl,setResourceUrl]=useState("");
+  const [file,setFile]=useState<File|null>(null);
+  const [uploading,setUploading]=useState(false);
+  const [uploadError,setUploadError]=useState("");
   const [description, setDescription] = useState("");
 
   const filteredMaterials = materials.filter((m) =>
     selectedSubject === "ALL" ? true : m.subject === selectedSubject
   );
 
-  const handleCreateMaterial = (e: React.FormEvent) => {
+  const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
+    setUploading(true);setUploadError("");
+    try {
+    const url = file ? await uploadMaterial(file) : safeResourceUrl(resourceUrl);
     addStudyMaterial({
       title,
       subject,
       type,
-      size: type === "VIDEO" ? "34.5 MB" : "1.8 MB",
-      url: "#",
+      size: file ? (file.size / 1024 / 1024).toFixed(2) + " MB" : "External link",
+      sizeBytes: file?.size || 0,
+      url,
       description,
       assignedTo: "ALL",
     });
 
     setTitle("");
     setDescription("");
-    setIsUploadModalOpen(false);
+    setIsUploadModalOpen(false);setFile(null);setResourceUrl("");
+    } catch(e) {setUploadError(e instanceof Error?e.message:"Upload failed");}finally{setUploading(false);}
   };
 
   return (
@@ -143,7 +153,7 @@ export default function TeacherMaterialsPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => alert(`Simulated download for "${m.title}"`)}
+                    onClick={() => window.open(safeResourceUrl(m.url), "_blank", "noopener,noreferrer")}
                     className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -170,16 +180,10 @@ export default function TeacherMaterialsPage() {
               </div>
 
               <form onSubmit={handleCreateMaterial} className="space-y-4">
-                {/* Drag and Drop Zone */}
-                <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 text-center space-y-2 hover:bg-indigo-50/30 hover:border-indigo-300 transition-colors cursor-pointer">
-                  <UploadCloud className="w-8 h-8 text-indigo-600 mx-auto" />
-                  <p className="text-xs font-bold text-slate-700">
-                    Click to upload or drag & drop files
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    PDF, DOCX, MP4, PNG (Max 50MB)
-                  </p>
-                </div>
+                <label className="block text-sm">Upload a file (up to 50 MB)<input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.mp4,.txt" onChange={e=>setFile(e.target.files?.[0]||null)} className="block mt-2"/></label>
+                <label className="block text-sm">Or paste a video / notes link<input type="url" value={resourceUrl} onChange={e=>setResourceUrl(e.target.value)} required={!file} placeholder="https://youtube.com/watch?v=?" className="block border rounded-lg w-full p-2 mt-2"/></label>
+                <p className="text-xs text-slate-500">Private YouTube videos require the viewer to have access from the video owner.</p>
+                {uploadError&&<p role="alert" className="text-red-600">{uploadError}</p>}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -201,6 +205,7 @@ export default function TeacherMaterialsPage() {
                       Subject
                     </label>
                     <select
+                      required
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-bold text-slate-800"
@@ -223,7 +228,7 @@ export default function TeacherMaterialsPage() {
                       className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-bold text-slate-800"
                     >
                       <option value="PDF">PDF Document</option>
-                      <option value="VIDEO">Video Lecture (MP4)</option>
+                      <option value="VIDEO">Video / YouTube link</option>
                       <option value="DOC">Notes (DOCX)</option>
                       <option value="IMAGE">Infographic (PNG/JPG)</option>
                     </select>
@@ -253,9 +258,10 @@ export default function TeacherMaterialsPage() {
                   </button>
                   <button
                     type="submit"
+                    disabled={uploading}
                     className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs"
                   >
-                    Save & Share
+                    {uploading ? "Uploading?" : "Save & Share"}
                   </button>
                 </div>
               </form>

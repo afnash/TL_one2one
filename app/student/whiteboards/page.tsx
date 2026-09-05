@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 
 export default function StudentWhiteboardsPage() {
-  const { whiteboards, updateWhiteboardElements } = useLMS();
+  const { user, whiteboards, updateWhiteboardElements } = useLMS();
 
-  const [activeBoardId, setActiveBoardId] = useState<string>("wb-rahul-math-practice");
+  const [activeBoardId, setActiveBoardId] = useState<string>("");
 
   const currentBoard =
     whiteboards.find((w) => w.id === activeBoardId) || whiteboards[0];
@@ -32,7 +32,7 @@ export default function StudentWhiteboardsPage() {
           <StudentBoardSelector
             currentWhiteboardId={activeBoardId}
             onSelectBoard={(id) => setActiveBoardId(id)}
-            selectedStudentId="s1"
+            selectedStudentId={user.id}
             isTeacherMode={false}
           />
 
@@ -46,13 +46,14 @@ export default function StudentWhiteboardsPage() {
         {/* Interactive Infinite Canvas */}
         <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs">
           <WhiteboardCanvas
-            key={activeBoardId}
+            key={currentBoard?.id}
             initialWhiteboard={currentBoard}
-            whiteboardId={activeBoardId}
+            whiteboardId={currentBoard?.id}
             roleLabel="Student"
             showTeacherTools={false}
-            onSave={(newElements) => {
-              updateWhiteboardElements(activeBoardId, newElements);
+            readOnly={!currentBoard}
+            onSave={(newElements, previousElements) => {
+              updateWhiteboardElements(currentBoard?.id || "", newElements, previousElements);
             }}
           />
         </div>
