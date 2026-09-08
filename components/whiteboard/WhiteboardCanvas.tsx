@@ -40,6 +40,8 @@ import {
   Download,
   FileDown,
   Sparkles,
+  Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -79,6 +81,8 @@ export function WhiteboardCanvas({
   const readOnly = suppliedReadOnly || (role === "STUDENT" && (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" || submissions.some(s=>s.whiteboardId===initialWhiteboard?.id && ["SUBMITTED","REVIEWED"].includes(s.status)))) || (role === "STUDENT" && !!session && (session.status !== "LIVE" || ((session.studentIds?.length || 1) > 1 && !session.writerIds?.includes(user.id))));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Whiteboard elements state with undo/redo history
   const [elements, setElements] = useState<WhiteboardElement[]>(
@@ -150,6 +154,111 @@ export function WhiteboardCanvas({
   }, [initialWhiteboard?.id]);
 
   useEffect(() => { if (!isDrawing && initialWhiteboard?.elements) setElements(initialWhiteboard.elements); }, [initialWhiteboard?.elements, isDrawing]);
+
+  // Clipboard Image Paste Handler & File Upload Handler
+  useEffect(() => {
+    if (readOnly) return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (!file) continue;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            if (!dataUrl) return;
+
+            const img = new Image();
+            img.onload = () => {
+              let w = img.width || 300;
+              let h = img.height || 200;
+              const maxW = 450;
+              if (w > maxW) {
+                h = (maxW / w) * h;
+                w = maxW;
+              }
+
+              const canvas = canvasRef.current;
+              const canvasWidth = canvas?.clientWidth || 800;
+              const canvasHeight = canvas?.clientHeight || 600;
+              const pasteX = (canvasWidth / 2 - pan.x) / zoom - w / 2;
+              const pasteY = (canvasHeight / 2 - pan.y) / zoom - h / 2;
+
+              const newEl: WhiteboardElement = {
+                id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                type: "image",
+                x: Math.max(20, pasteX),
+                y: Math.max(20, pasteY),
+                width: Math.round(w),
+                height: Math.round(h),
+                imageUrl: dataUrl,
+                strokeColor: "#000000",
+                strokeWidth: 1,
+              };
+
+              pushToHistory([...elements, newEl]);
+            };
+            img.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [readOnly, elements, pushToHistory, pan, zoom]);
+
+  const handleImageFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width || 300;
+        let h = img.height || 200;
+        const maxW = 450;
+        if (w > maxW) {
+          h = (maxW / w) * h;
+          w = maxW;
+        }
+
+        const canvas = canvasRef.current;
+        const canvasWidth = canvas?.clientWidth || 800;
+        const canvasHeight = canvas?.clientHeight || 600;
+        const pasteX = (canvasWidth / 2 - pan.x) / zoom - w / 2;
+        const pasteY = (canvasHeight / 2 - pan.y) / zoom - h / 2;
+
+        const newEl: WhiteboardElement = {
+          id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          type: "image",
+          x: Math.max(20, pasteX),
+          y: Math.max(20, pasteY),
+          width: Math.round(w),
+          height: Math.round(h),
+          imageUrl: dataUrl,
+          strokeColor: "#000000",
+          strokeWidth: 1,
+        };
+
+        pushToHistory([...elements, newEl]);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    if (e.target) e.target.value = "";
+  };
 
   // Handle canvas sizing and redraw
   const redrawCanvas = useCallback(() => {
@@ -377,6 +486,31 @@ export function WhiteboardCanvas({
             ctx.font = "bold 16px 'Inter', sans-serif";
             ctx.fillStyle = "#ffffff";
             ctx.fillText("★", el.x + 10, el.y + 22);
+          }
+          break;
+        }
+
+        case "image": {
+          const src = el.imageUrl || el.text;
+          if (!src) break;
+          let img = imageCache.current.get(src);
+          if (!img) {
+            img = new Image();
+            img.src = src;
+            img.onload = () => {
+              redrawCanvas();
+            };
+            imageCache.current.set(src, img);
+          }
+          const w = el.width || 300;
+          const h = el.height || 200;
+          if (img.complete && img.naturalWidth !== 0) {
+            ctx.drawImage(img, el.x, el.y, w, h);
+          } else {
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(el.x, el.y, w, h);
+            ctx.strokeRect(el.x, el.y, w, h);
           }
           break;
         }
@@ -824,6 +958,22 @@ export function WhiteboardCanvas({
           >
             <StickyNote className="w-4 h-4" />
           </button>
+
+          <button
+            title="Upload Image (or Paste directly via Ctrl+V)"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100 text-slate-700 hover:text-indigo-600"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageFileSelect}
+            accept="image/*"
+            className="hidden"
+          />
 
           {/* Teacher Grading & Annotation Stamps */}
           {showTeacherTools && (

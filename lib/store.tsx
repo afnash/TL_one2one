@@ -64,6 +64,7 @@ interface LMSContextType {
   
   // Assignment Operations
   createAssignment: (assignment: Omit<Assignment, "id" | "createdAt">) => Assignment;
+  updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   submitAssignment: (assignmentId: string, studentId: string, whiteboardId: string) => Submission;
   gradeSubmission: (
     submissionId: string,
@@ -302,6 +303,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     return newAssignment;
   };
 
+  const updateAssignment = (id: string, updates: Partial<Assignment>) => {
+    setAssignments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+    );
+  };
+
   const submitAssignment = (
     assignmentId: string,
     studentId: string,
@@ -528,6 +535,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         updateWhiteboardElements,
         createWhiteboard,
         createAssignment,
+        updateAssignment,
         submitAssignment,
         gradeSubmission,
         createSessionReport,

@@ -34,10 +34,9 @@ export default function SessionReportPage({ params }: PageProps) {
 
   const existingReport = sessionReports.find(r=>r.sessionId===sessionId);
 
-  // Form State
-  const [sessionDate, setSessionDate] = useState<string>(
-    existingReport?.date || currentSession?.date || ""
-  );
+  // Form State - Fixed to today() uneditable
+  const todayStr = new Date().toISOString().split("T")[0];
+  const sessionDate = todayStr;
   const [startTime, setStartTime] = useState<string>(existingReport?.startTime || currentSession?.actualStartTime || "");
   const [endTime, setEndTime] = useState<string>(existingReport?.endTime || currentSession?.actualEndTime || "");
   const [durationMinutes, setDurationMinutes] = useState<number>(
@@ -185,8 +184,9 @@ export default function SessionReportPage({ params }: PageProps) {
                   <input
                     type="date"
                     value={sessionDate}
-                    onChange={(e) => setSessionDate(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                    readOnly
+                    title="Session report date is fixed to Today and cannot be changed."
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-500 cursor-not-allowed select-none"
                   />
                 </div>
               </div>

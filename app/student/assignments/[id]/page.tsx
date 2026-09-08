@@ -199,6 +199,7 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
               whiteboardId={currentBoard?.id}
               roleLabel="Student"
               showTeacherTools={false}
+              readOnly={isSubmitted || submission?.status === "SUBMITTED" || submission?.status === "REVIEWED"}
               onSave={(newElements, previousElements) => {
                 if (currentBoard) {
                   updateWhiteboardElements(currentBoard.id, newElements, previousElements);
