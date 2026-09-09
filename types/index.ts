@@ -62,6 +62,9 @@ export interface Subject {
 export type SessionStatus = "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED";
 
 export interface Session {
+  codeDocument?: import("@/lib/coding").CodeDocument;
+  codeEditorId?: string;
+  codeRun?: import("@/lib/coding").CodeRun;
   studentIds?: string[];
   startedAt?: string;
   raisedHands?: string[];
@@ -100,6 +103,7 @@ export type WhiteboardElementType =
   | "text"
   | "stamp"
   | "sticky"
+  | "image"
   | "question_card";
 
 export interface WhiteboardElement {
@@ -118,6 +122,7 @@ export interface WhiteboardElement {
   stampType?: "correct" | "incorrect" | "review" | "star";
   questionNumber?: number;
   questionText?: string;
+  imageUrl?: string;
   authorRole?: UserRole;
   authorName?: string;
   timestamp?: number;

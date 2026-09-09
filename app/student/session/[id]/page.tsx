@@ -4,6 +4,7 @@ import { BoardAccess } from "@/components/session/BoardAccess";
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
+import { SessionWorkspace } from "@/components/session/SessionWorkspace";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
 import { LiveVideoTile } from "@/components/session/LiveVideoTile";
@@ -220,18 +221,20 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
             </span>
           </div>
 
-          <div className="flex-1 w-full h-full relative">
-            <WhiteboardCanvas
-                  readOnly={currentWhiteboard?.category === "LIVE_CLASS" && (currentSession.status !== "LIVE" || ((currentSession.studentIds?.length || 1) > 1 && !currentSession.writerIds?.includes(user.id)))}
-              key={activeWhiteboardId}
-              initialWhiteboard={currentWhiteboard}
-              whiteboardId={activeWhiteboardId}
-              roleLabel="Student"
-              showTeacherTools={false}
-              onSave={(newElements, previousElements) => {
-                updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
-              }}
-            />
+          <div className="flex-1 min-h-0 w-full relative">
+            <SessionWorkspace session={currentSession}>
+              <WhiteboardCanvas
+                    readOnly={currentWhiteboard?.category === "LIVE_CLASS" && (currentSession.status !== "LIVE" || ((currentSession.studentIds?.length || 1) > 1 && !currentSession.writerIds?.includes(user.id)))}
+                key={activeWhiteboardId}
+                initialWhiteboard={currentWhiteboard}
+                whiteboardId={activeWhiteboardId}
+                roleLabel="Student"
+                showTeacherTools={false}
+                onSave={(newElements, previousElements) => {
+                  updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
+                }}
+              />
+            </SessionWorkspace>
 
             {/* FLOATING VIDEO CAMERA POP-UP ON BOARD (When Minimized) */}
             {isVideoPanelMinimized && (

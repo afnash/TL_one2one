@@ -4,6 +4,7 @@ import { BoardAccess } from "@/components/session/BoardAccess";
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
+import { SessionWorkspace } from "@/components/session/SessionWorkspace";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
 import { LiveVideoTile } from "@/components/session/LiveVideoTile";
@@ -370,18 +371,20 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
           </div>
 
           {/* Interactive Infinite Canvas */}
-          <div className="flex-1 w-full h-full relative">
-            <WhiteboardCanvas
-              key={activeWhiteboardId}
-              initialWhiteboard={currentWhiteboard}
-              whiteboardId={activeWhiteboardId}
-              roleLabel="Teacher"
-              showTeacherTools={true}
-              readOnly={!currentWhiteboard}
-              onSave={(newElements, previousElements) => {
-                updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
-              }}
-            />
+          <div className="flex-1 min-h-0 w-full relative">
+            <SessionWorkspace session={currentSession}>
+              <WhiteboardCanvas
+                key={activeWhiteboardId}
+                initialWhiteboard={currentWhiteboard}
+                whiteboardId={activeWhiteboardId}
+                roleLabel="Teacher"
+                showTeacherTools={true}
+                readOnly={!currentWhiteboard}
+                onSave={(newElements, previousElements) => {
+                  updateWhiteboardElements(currentWhiteboard?.id || "", newElements, previousElements);
+                }}
+              />
+            </SessionWorkspace>
 
             {/* FLOATING VIDEO CAMERA POP-UP ON BOARD ONLY (When Minimized) */}
             {isVideoPanelMinimized && (

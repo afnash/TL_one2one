@@ -27,6 +27,7 @@ const teacher = [
   ["Dashboard", "/teacher/dashboard", LayoutDashboard],
   ["Students", "/teacher/students", Users],
   ["Sessions", "/teacher/sessions", Video],
+  ["Conference", "/teacher/conference", Users],
   ["Whiteboards", "/teacher/whiteboards", Layers],
   ["Assignments", "/teacher/assignments", BookOpen],
   ["Materials", "/teacher/materials", FolderOpen],
@@ -38,6 +39,7 @@ const teacher = [
 const student = [
   ["Home", "/student/dashboard", LayoutDashboard],
   ["Sessions", "/student/sessions", Video],
+  ["Conference", "/student/conference", Users],
   ["Whiteboards", "/student/whiteboards", Layers],
   ["Assignments", "/student/assignments", BookOpen],
   ["Materials", "/student/materials", FolderOpen],

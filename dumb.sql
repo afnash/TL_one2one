@@ -1,34 +1,176 @@
--- OneToOne LMS: paste this entire file in the Supabase SQL Editor and Run.
--- No sample data. Re-runnable; existing rows are preserved.
--- TEMPORARY ROLE-ONLY MODE: anon policies deliberately allow shared read/write.
--- Anyone holding the public key can access these records. The /manage password
--- protects the admin pages, not the public Data API. Add Auth + ownership RLS
--- before using this project for confidential student information.
-begin;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-do $$
-declare tab text;
-begin
-  foreach tab in array array['teachers','students','subjects','sessions','whiteboards','assignments','submissions','materials','sessionreports','notifications','profiles'] loop
-    execute format('create table if not exists public.%I (id text primary key, data jsonb not null, updated_at timestamptz not null default now(), check (jsonb_typeof(data) = ''object''), check (data->>''id'' = id))', 'lms_' || tab);
-    execute format('alter table public.%I enable row level security', 'lms_' || tab);
-    execute format('drop policy if exists prototype_access on public.%I', 'lms_' || tab);
-    execute format('create policy prototype_access on public.%I for all to anon, authenticated using (true) with check (true)', 'lms_' || tab);
-    execute format('grant select, insert, update, delete on public.%I to anon, authenticated', 'lms_' || tab);
-    execute format('create index if not exists %I on public.%I using gin(data)', 'lms_' || tab || '_data_idx', 'lms_' || tab);
-  end loop;
-end $$;
+-- ----------------------------------------------------------------------
+-- Table Definitions (Idempotent)
+-- ----------------------------------------------------------------------
 
-create unique index if not exists lms_submission_student_assignment on public.lms_submissions ((data->>'assignmentId'), (data->>'studentId'));
-create unique index if not exists lms_report_session on public.lms_sessionreports ((data->>'sessionId'));
-create index if not exists lms_students_teacher on public.lms_students ((data->>'teacherId'));
-create index if not exists lms_sessions_teacher on public.lms_sessions ((data->>'teacherId'));
+create table if not exists "public"."lms_assignments" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_assignments_pkey" primary key ("id"),
+    constraint "lms_assignments_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_assignments_data_id_check" check ((data ->> 'id'::text) = id)
+);
 
--- Merge changed fields atomically. Board element deltas are merged under a row
--- lock: simultaneous strokes with different IDs are never lost. Deleting a stroke
--- removes only IDs the editing client actually saw. Same-element edits use last write.
-create or replace function public.lms_patch(p_table text, p_id text, p_patch jsonb, p_previous jsonb default '{}'::jsonb)
-returns void language plpgsql security invoker set search_path = public as $$
+alter table "public"."lms_assignments" enable row level security;
+
+create table if not exists "public"."lms_materials" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_materials_pkey" primary key ("id"),
+    constraint "lms_materials_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_materials_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_materials" enable row level security;
+
+create table if not exists "public"."lms_notifications" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_notifications_pkey" primary key ("id"),
+    constraint "lms_notifications_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_notifications_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_notifications" enable row level security;
+
+create table if not exists "public"."lms_profiles" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_profiles_pkey" primary key ("id"),
+    constraint "lms_profiles_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_profiles_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_profiles" enable row level security;
+
+create table if not exists "public"."lms_sessionreports" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_sessionreports_pkey" primary key ("id"),
+    constraint "lms_sessionreports_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_sessionreports_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_sessionreports" enable row level security;
+
+create table if not exists "public"."lms_sessions" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_sessions_pkey" primary key ("id"),
+    constraint "lms_sessions_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_sessions_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_sessions" enable row level security;
+
+create table if not exists "public"."lms_students" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_students_pkey" primary key ("id"),
+    constraint "lms_students_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_students_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_students" enable row level security;
+
+create table if not exists "public"."lms_subjects" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_subjects_pkey" primary key ("id"),
+    constraint "lms_subjects_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_subjects_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_subjects" enable row level security;
+
+create table if not exists "public"."lms_submissions" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_submissions_pkey" primary key ("id"),
+    constraint "lms_submissions_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_submissions_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_submissions" enable row level security;
+
+create table if not exists "public"."lms_teachers" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_teachers_pkey" primary key ("id"),
+    constraint "lms_teachers_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_teachers_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_teachers" enable row level security;
+
+create table if not exists "public"."lms_whiteboards" (
+    "id" text not null,
+    "data" jsonb not null,
+    "updated_at" timestamp with time zone not null default now(),
+    constraint "lms_whiteboards_pkey" primary key ("id"),
+    constraint "lms_whiteboards_data_check" check (jsonb_typeof(data) = 'object'::text),
+    constraint "lms_whiteboards_data_id_check" check ((data ->> 'id'::text) = id)
+);
+
+alter table "public"."lms_whiteboards" enable row level security;
+
+-- ----------------------------------------------------------------------
+-- Indexes
+-- ----------------------------------------------------------------------
+
+CREATE INDEX IF NOT EXISTS lms_assignments_data_idx ON public.lms_assignments USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_materials_data_idx ON public.lms_materials USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_notifications_data_idx ON public.lms_notifications USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_profiles_data_idx ON public.lms_profiles USING gin (data);
+
+CREATE UNIQUE INDEX IF NOT EXISTS lms_report_session ON public.lms_sessionreports USING btree (((data ->> 'sessionId'::text)));
+
+CREATE INDEX IF NOT EXISTS lms_sessionreports_data_idx ON public.lms_sessionreports USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_sessions_data_idx ON public.lms_sessions USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_sessions_teacher ON public.lms_sessions USING btree (((data ->> 'teacherId'::text)));
+
+CREATE INDEX IF NOT EXISTS lms_students_data_idx ON public.lms_students USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_students_teacher ON public.lms_students USING btree (((data ->> 'teacherId'::text)));
+
+CREATE INDEX IF NOT EXISTS lms_subjects_data_idx ON public.lms_subjects USING gin (data);
+
+CREATE UNIQUE INDEX IF NOT EXISTS lms_submission_student_assignment ON public.lms_submissions USING btree (((data ->> 'assignmentId'::text)), ((data ->> 'studentId'::text)));
+
+CREATE INDEX IF NOT EXISTS lms_submissions_data_idx ON public.lms_submissions USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_teachers_data_idx ON public.lms_teachers USING gin (data);
+
+CREATE INDEX IF NOT EXISTS lms_whiteboards_data_idx ON public.lms_whiteboards USING gin (data);
+
+-- ----------------------------------------------------------------------
+-- Functions
+-- ----------------------------------------------------------------------
+
+set check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION public.lms_patch(p_table text, p_id text, p_patch jsonb, p_previous jsonb DEFAULT '{}'::jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY INVOKER
+ SET search_path TO 'public'
+AS $function$
 declare existing jsonb; merged jsonb; changed jsonb; removed text[]; item jsonb;
 begin
   if p_table <> all(array['lms_teachers','lms_students','lms_subjects','lms_sessions','lms_whiteboards','lms_assignments','lms_submissions','lms_materials','lms_sessionreports','lms_notifications','lms_profiles']) then
@@ -70,18 +212,494 @@ begin
     if (merged->>'score')::numeric < 0 or (merged->>'score')::numeric > (merged->>'maxScore')::numeric then raise exception 'Marks must be between zero and the maximum score'; end if;
   end if;
   execute format('insert into public.%I (id,data) values ($1,$2) on conflict (id) do update set data=excluded.data, updated_at=now()', p_table) using p_id, merged;
-end $$;
-revoke all on function public.lms_patch(text,text,jsonb,jsonb) from public;
-grant execute on function public.lms_patch(text,text,jsonb,jsonb) to anon, authenticated;
+end;
+$function$
+;
+
+-- ----------------------------------------------------------------------
+-- Permissions & Grants
+-- ----------------------------------------------------------------------
+
+grant delete on table "public"."lms_assignments" to "anon";
+grant insert on table "public"."lms_assignments" to "anon";
+grant references on table "public"."lms_assignments" to "anon";
+grant select on table "public"."lms_assignments" to "anon";
+grant trigger on table "public"."lms_assignments" to "anon";
+grant truncate on table "public"."lms_assignments" to "anon";
+grant update on table "public"."lms_assignments" to "anon";
+
+grant delete on table "public"."lms_assignments" to "authenticated";
+grant insert on table "public"."lms_assignments" to "authenticated";
+grant references on table "public"."lms_assignments" to "authenticated";
+grant select on table "public"."lms_assignments" to "authenticated";
+grant trigger on table "public"."lms_assignments" to "authenticated";
+grant truncate on table "public"."lms_assignments" to "authenticated";
+grant update on table "public"."lms_assignments" to "authenticated";
+
+grant delete on table "public"."lms_assignments" to "service_role";
+grant insert on table "public"."lms_assignments" to "service_role";
+grant references on table "public"."lms_assignments" to "service_role";
+grant select on table "public"."lms_assignments" to "service_role";
+grant trigger on table "public"."lms_assignments" to "service_role";
+grant truncate on table "public"."lms_assignments" to "service_role";
+grant update on table "public"."lms_assignments" to "service_role";
+
+grant delete on table "public"."lms_materials" to "anon";
+grant insert on table "public"."lms_materials" to "anon";
+grant references on table "public"."lms_materials" to "anon";
+grant select on table "public"."lms_materials" to "anon";
+grant trigger on table "public"."lms_materials" to "anon";
+grant truncate on table "public"."lms_materials" to "anon";
+grant update on table "public"."lms_materials" to "anon";
+
+grant delete on table "public"."lms_materials" to "authenticated";
+grant insert on table "public"."lms_materials" to "authenticated";
+grant references on table "public"."lms_materials" to "authenticated";
+grant select on table "public"."lms_materials" to "authenticated";
+grant trigger on table "public"."lms_materials" to "authenticated";
+grant truncate on table "public"."lms_materials" to "authenticated";
+grant update on table "public"."lms_materials" to "authenticated";
+
+grant delete on table "public"."lms_materials" to "service_role";
+grant insert on table "public"."lms_materials" to "service_role";
+grant references on table "public"."lms_materials" to "service_role";
+grant select on table "public"."lms_materials" to "service_role";
+grant trigger on table "public"."lms_materials" to "service_role";
+grant truncate on table "public"."lms_materials" to "service_role";
+grant update on table "public"."lms_materials" to "service_role";
+
+grant delete on table "public"."lms_notifications" to "anon";
+grant insert on table "public"."lms_notifications" to "anon";
+grant references on table "public"."lms_notifications" to "anon";
+grant select on table "public"."lms_notifications" to "anon";
+grant trigger on table "public"."lms_notifications" to "anon";
+grant truncate on table "public"."lms_notifications" to "anon";
+grant update on table "public"."lms_notifications" to "anon";
+
+grant delete on table "public"."lms_notifications" to "authenticated";
+grant insert on table "public"."lms_notifications" to "authenticated";
+grant references on table "public"."lms_notifications" to "authenticated";
+grant select on table "public"."lms_notifications" to "authenticated";
+grant trigger on table "public"."lms_notifications" to "authenticated";
+grant truncate on table "public"."lms_notifications" to "authenticated";
+grant update on table "public"."lms_notifications" to "authenticated";
+
+grant delete on table "public"."lms_notifications" to "service_role";
+grant insert on table "public"."lms_notifications" to "service_role";
+grant references on table "public"."lms_notifications" to "service_role";
+grant select on table "public"."lms_notifications" to "service_role";
+grant trigger on table "public"."lms_notifications" to "service_role";
+grant truncate on table "public"."lms_notifications" to "service_role";
+grant update on table "public"."lms_notifications" to "service_role";
+
+grant delete on table "public"."lms_profiles" to "anon";
+grant insert on table "public"."lms_profiles" to "anon";
+grant references on table "public"."lms_profiles" to "anon";
+grant select on table "public"."lms_profiles" to "anon";
+grant trigger on table "public"."lms_profiles" to "anon";
+grant truncate on table "public"."lms_profiles" to "anon";
+grant update on table "public"."lms_profiles" to "anon";
+
+grant delete on table "public"."lms_profiles" to "authenticated";
+grant insert on table "public"."lms_profiles" to "authenticated";
+grant references on table "public"."lms_profiles" to "authenticated";
+grant select on table "public"."lms_profiles" to "authenticated";
+grant trigger on table "public"."lms_profiles" to "authenticated";
+grant truncate on table "public"."lms_profiles" to "authenticated";
+grant update on table "public"."lms_profiles" to "authenticated";
+
+grant delete on table "public"."lms_profiles" to "service_role";
+grant insert on table "public"."lms_profiles" to "service_role";
+grant references on table "public"."lms_profiles" to "service_role";
+grant select on table "public"."lms_profiles" to "service_role";
+grant trigger on table "public"."lms_profiles" to "service_role";
+grant truncate on table "public"."lms_profiles" to "service_role";
+grant update on table "public"."lms_profiles" to "service_role";
+
+grant delete on table "public"."lms_sessionreports" to "anon";
+grant insert on table "public"."lms_sessionreports" to "anon";
+grant references on table "public"."lms_sessionreports" to "anon";
+grant select on table "public"."lms_sessionreports" to "anon";
+grant trigger on table "public"."lms_sessionreports" to "anon";
+grant truncate on table "public"."lms_sessionreports" to "anon";
+grant update on table "public"."lms_sessionreports" to "anon";
+
+grant delete on table "public"."lms_sessionreports" to "authenticated";
+grant insert on table "public"."lms_sessionreports" to "authenticated";
+grant references on table "public"."lms_sessionreports" to "authenticated";
+grant select on table "public"."lms_sessionreports" to "authenticated";
+grant trigger on table "public"."lms_sessionreports" to "authenticated";
+grant truncate on table "public"."lms_sessionreports" to "authenticated";
+grant update on table "public"."lms_sessionreports" to "authenticated";
+
+grant delete on table "public"."lms_sessionreports" to "service_role";
+grant insert on table "public"."lms_sessionreports" to "service_role";
+grant references on table "public"."lms_sessionreports" to "service_role";
+grant select on table "public"."lms_sessionreports" to "service_role";
+grant trigger on table "public"."lms_sessionreports" to "service_role";
+grant truncate on table "public"."lms_sessionreports" to "service_role";
+grant update on table "public"."lms_sessionreports" to "service_role";
+
+grant delete on table "public"."lms_sessions" to "anon";
+grant insert on table "public"."lms_sessions" to "anon";
+grant references on table "public"."lms_sessions" to "anon";
+grant select on table "public"."lms_sessions" to "anon";
+grant trigger on table "public"."lms_sessions" to "anon";
+grant truncate on table "public"."lms_sessions" to "anon";
+grant update on table "public"."lms_sessions" to "anon";
+
+grant delete on table "public"."lms_sessions" to "authenticated";
+grant insert on table "public"."lms_sessions" to "authenticated";
+grant references on table "public"."lms_sessions" to "authenticated";
+grant select on table "public"."lms_sessions" to "authenticated";
+grant trigger on table "public"."lms_sessions" to "authenticated";
+grant truncate on table "public"."lms_sessions" to "authenticated";
+grant update on table "public"."lms_sessions" to "authenticated";
+
+grant delete on table "public"."lms_sessions" to "service_role";
+grant insert on table "public"."lms_sessions" to "service_role";
+grant references on table "public"."lms_sessions" to "service_role";
+grant select on table "public"."lms_sessions" to "service_role";
+grant trigger on table "public"."lms_sessions" to "service_role";
+grant truncate on table "public"."lms_sessions" to "service_role";
+grant update on table "public"."lms_sessions" to "service_role";
+
+grant delete on table "public"."lms_students" to "anon";
+grant insert on table "public"."lms_students" to "anon";
+grant references on table "public"."lms_students" to "anon";
+grant select on table "public"."lms_students" to "anon";
+grant trigger on table "public"."lms_students" to "anon";
+grant truncate on table "public"."lms_students" to "anon";
+grant update on table "public"."lms_students" to "anon";
+
+grant delete on table "public"."lms_students" to "authenticated";
+grant insert on table "public"."lms_students" to "authenticated";
+grant references on table "public"."lms_students" to "authenticated";
+grant select on table "public"."lms_students" to "authenticated";
+grant trigger on table "public"."lms_students" to "authenticated";
+grant truncate on table "public"."lms_students" to "authenticated";
+grant update on table "public"."lms_students" to "authenticated";
+
+grant delete on table "public"."lms_students" to "service_role";
+grant insert on table "public"."lms_students" to "service_role";
+grant references on table "public"."lms_students" to "service_role";
+grant select on table "public"."lms_students" to "service_role";
+grant trigger on table "public"."lms_students" to "service_role";
+grant truncate on table "public"."lms_students" to "service_role";
+grant update on table "public"."lms_students" to "service_role";
+
+grant delete on table "public"."lms_subjects" to "anon";
+grant insert on table "public"."lms_subjects" to "anon";
+grant references on table "public"."lms_subjects" to "anon";
+grant select on table "public"."lms_subjects" to "anon";
+grant trigger on table "public"."lms_subjects" to "anon";
+grant truncate on table "public"."lms_subjects" to "anon";
+grant update on table "public"."lms_subjects" to "anon";
+
+grant delete on table "public"."lms_subjects" to "authenticated";
+grant insert on table "public"."lms_subjects" to "authenticated";
+grant references on table "public"."lms_subjects" to "authenticated";
+grant select on table "public"."lms_subjects" to "authenticated";
+grant trigger on table "public"."lms_subjects" to "authenticated";
+grant truncate on table "public"."lms_subjects" to "authenticated";
+grant update on table "public"."lms_subjects" to "authenticated";
+
+grant delete on table "public"."lms_subjects" to "service_role";
+grant insert on table "public"."lms_subjects" to "service_role";
+grant references on table "public"."lms_subjects" to "service_role";
+grant select on table "public"."lms_subjects" to "service_role";
+grant trigger on table "public"."lms_subjects" to "service_role";
+grant truncate on table "public"."lms_subjects" to "service_role";
+grant update on table "public"."lms_subjects" to "service_role";
+
+grant delete on table "public"."lms_submissions" to "anon";
+grant insert on table "public"."lms_submissions" to "anon";
+grant references on table "public"."lms_submissions" to "anon";
+grant select on table "public"."lms_submissions" to "anon";
+grant trigger on table "public"."lms_submissions" to "anon";
+grant truncate on table "public"."lms_submissions" to "anon";
+grant update on table "public"."lms_submissions" to "anon";
+
+grant delete on table "public"."lms_submissions" to "authenticated";
+grant insert on table "public"."lms_submissions" to "authenticated";
+grant references on table "public"."lms_submissions" to "authenticated";
+grant select on table "public"."lms_submissions" to "authenticated";
+grant trigger on table "public"."lms_submissions" to "authenticated";
+grant truncate on table "public"."lms_submissions" to "authenticated";
+grant update on table "public"."lms_submissions" to "authenticated";
+
+grant delete on table "public"."lms_submissions" to "service_role";
+grant insert on table "public"."lms_submissions" to "service_role";
+grant references on table "public"."lms_submissions" to "service_role";
+grant select on table "public"."lms_submissions" to "service_role";
+grant trigger on table "public"."lms_submissions" to "service_role";
+grant truncate on table "public"."lms_submissions" to "service_role";
+grant update on table "public"."lms_submissions" to "service_role";
+
+grant delete on table "public"."lms_teachers" to "anon";
+grant insert on table "public"."lms_teachers" to "anon";
+grant references on table "public"."lms_teachers" to "anon";
+grant select on table "public"."lms_teachers" to "anon";
+grant trigger on table "public"."lms_teachers" to "anon";
+grant truncate on table "public"."lms_teachers" to "anon";
+grant update on table "public"."lms_teachers" to "anon";
+
+grant delete on table "public"."lms_teachers" to "authenticated";
+grant insert on table "public"."lms_teachers" to "authenticated";
+grant references on table "public"."lms_teachers" to "authenticated";
+grant select on table "public"."lms_teachers" to "authenticated";
+grant trigger on table "public"."lms_teachers" to "authenticated";
+grant truncate on table "public"."lms_teachers" to "authenticated";
+grant update on table "public"."lms_teachers" to "authenticated";
+
+grant delete on table "public"."lms_teachers" to "service_role";
+grant insert on table "public"."lms_teachers" to "service_role";
+grant references on table "public"."lms_teachers" to "service_role";
+grant select on table "public"."lms_teachers" to "service_role";
+grant trigger on table "public"."lms_teachers" to "service_role";
+grant truncate on table "public"."lms_teachers" to "service_role";
+grant update on table "public"."lms_teachers" to "service_role";
+
+grant delete on table "public"."lms_whiteboards" to "anon";
+grant insert on table "public"."lms_whiteboards" to "anon";
+grant references on table "public"."lms_whiteboards" to "anon";
+grant select on table "public"."lms_whiteboards" to "anon";
+grant trigger on table "public"."lms_whiteboards" to "anon";
+grant truncate on table "public"."lms_whiteboards" to "anon";
+grant update on table "public"."lms_whiteboards" to "anon";
+
+grant delete on table "public"."lms_whiteboards" to "authenticated";
+grant insert on table "public"."lms_whiteboards" to "authenticated";
+grant references on table "public"."lms_whiteboards" to "authenticated";
+grant select on table "public"."lms_whiteboards" to "authenticated";
+grant trigger on table "public"."lms_whiteboards" to "authenticated";
+grant truncate on table "public"."lms_whiteboards" to "authenticated";
+grant update on table "public"."lms_whiteboards" to "authenticated";
+
+grant delete on table "public"."lms_whiteboards" to "service_role";
+grant insert on table "public"."lms_whiteboards" to "service_role";
+grant references on table "public"."lms_whiteboards" to "service_role";
+grant select on table "public"."lms_whiteboards" to "service_role";
+grant trigger on table "public"."lms_whiteboards" to "service_role";
+grant truncate on table "public"."lms_whiteboards" to "service_role";
+grant update on table "public"."lms_whiteboards" to "service_role";
+
+revoke all on function "public"."lms_patch"(text, text, jsonb, jsonb) from public;
+grant execute on function "public"."lms_patch"(text, text, jsonb, jsonb) to "anon";
+grant execute on function "public"."lms_patch"(text, text, jsonb, jsonb) to "authenticated";
+grant execute on function "public"."lms_patch"(text, text, jsonb, jsonb) to "service_role";
+
+-- ----------------------------------------------------------------------
+-- RLS Policies (Idempotent)
+-- ----------------------------------------------------------------------
+
+drop policy if exists "prototype_access" on "public"."lms_assignments";
+create policy "prototype_access"
+on "public"."lms_assignments"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_materials";
+create policy "prototype_access"
+on "public"."lms_materials"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_notifications";
+create policy "prototype_access"
+on "public"."lms_notifications"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_profiles";
+create policy "prototype_access"
+on "public"."lms_profiles"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_sessionreports";
+create policy "prototype_access"
+on "public"."lms_sessionreports"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_sessions";
+create policy "prototype_access"
+on "public"."lms_sessions"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_students";
+create policy "prototype_access"
+on "public"."lms_students"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_subjects";
+create policy "prototype_access"
+on "public"."lms_subjects"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_submissions";
+create policy "prototype_access"
+on "public"."lms_submissions"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_teachers";
+create policy "prototype_access"
+on "public"."lms_teachers"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "prototype_access" on "public"."lms_whiteboards";
+create policy "prototype_access"
+on "public"."lms_whiteboards"
+as permissive
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+-- ----------------------------------------------------------------------
+-- Storage
+-- ----------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('study-materials', 'study-materials', true, 52428800, array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/png','image/jpeg','video/mp4','text/plain'])
 on conflict (id) do nothing;
-drop policy if exists lms_material_upload on storage.objects;
-create policy lms_material_upload on storage.objects for insert to anon, authenticated with check (bucket_id = 'study-materials');
-drop policy if exists lms_material_read on storage.objects;
-create policy lms_material_read on storage.objects for select to anon, authenticated using (bucket_id = 'study-materials');
-drop policy if exists lms_material_delete on storage.objects;
-create policy lms_material_delete on storage.objects for delete to anon, authenticated using (bucket_id = 'study-materials');
-notify pgrst, 'reload schema';
-commit;
+
+drop policy if exists "lms_material_upload" on "storage"."objects";
+create policy "lms_material_upload"
+on "storage"."objects"
+as permissive
+for insert
+to anon, authenticated
+with check ((bucket_id = 'study-materials'::text));
+
+drop policy if exists "lms_material_read" on "storage"."objects";
+create policy "lms_material_read"
+on "storage"."objects"
+as permissive
+for select
+to anon, authenticated
+using ((bucket_id = 'study-materials'::text));
+
+drop policy if exists "lms_material_delete" on "storage"."objects";
+create policy "lms_material_delete"
+on "storage"."objects"
+as permissive
+for delete
+to anon, authenticated
+using ((bucket_id = 'study-materials'::text));
+
+
+-- Conference rooms (also available as a standalone migration).
+-- Conference capability tokens are separate from the prototype's public LMS data.
+create table if not exists public.conference_rooms (
+  code text primary key,
+  host_token_hash bytea not null,
+  revision integer not null default 0,
+  data jsonb not null
+);
+alter table public.conference_rooms enable row level security;
+revoke all on public.conference_rooms from public, anon, authenticated;
+
+create or replace function public.conference_create(p_teacher_id text, p_title text, p_host_token text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare room_code text; room_data jsonb; host_name text;
+begin
+  if p_host_token is null or length(p_host_token) < 32 or length(p_host_token) > 200 then
+    raise exception 'Invalid host credential';
+  end if;
+  if p_title is null or length(trim(p_title)) < 1 or length(p_title) > 120 then
+    raise exception 'Enter a conference title (maximum 120 characters)';
+  end if;
+  select data->>'name' into host_name from public.lms_teachers where id = p_teacher_id;
+  if host_name is null then raise exception 'A teacher profile is required to host'; end if;
+  room_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 16));
+  room_data := jsonb_build_object('code', room_code, 'title', trim(p_title),
+    'hostId', p_teacher_id, 'hostName', host_name, 'status', 'LIVE',
+    'createdAt', now(), 'videoRoom', 'OneToOneConference' || replace(gen_random_uuid()::text, '-', ''),
+    'board', jsonb_build_object('id', 'conference-' || room_code, 'title', trim(p_title),
+      'subject', 'Conference', 'teacherId', p_teacher_id, 'category', 'LIVE_CLASS',
+      'lastEdited', now(), 'elements', '[]'::jsonb));
+  insert into public.conference_rooms(code, host_token_hash, data)
+    values(room_code, sha256(convert_to(p_host_token, 'UTF8')), room_data);
+  return room_data || jsonb_build_object('revision', 0);
+end;
+$$;
+
+create or replace function public.conference_read(p_code text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare result jsonb;
+begin
+  select data || jsonb_build_object('revision', revision) into result
+    from public.conference_rooms where code = p_code;
+  if result is null then raise exception 'Conference not found. Check the join code.'; end if;
+  return result;
+end;
+$$;
+
+create or replace function public.conference_update(p_code text, p_host_token text, p_revision integer, p_action text, p_elements jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare room public.conference_rooms%rowtype;
+begin
+  select * into room from public.conference_rooms where code = p_code for update;
+  if not found or p_host_token is null or room.host_token_hash <> sha256(convert_to(p_host_token, 'UTF8')) then
+    raise exception 'Only the conference host can change this room';
+  end if;
+  if room.data->>'status' <> 'LIVE' then raise exception 'This conference has ended'; end if;
+  if p_revision is null or p_revision <> room.revision then raise exception 'The board changed in another host tab. Reload before editing.'; end if;
+  if p_action = 'board' then
+    if p_elements is null or jsonb_typeof(p_elements) <> 'array' or octet_length(p_elements::text) > 2000000 then
+      raise exception 'Invalid board or board exceeds 2 MB';
+    end if;
+    room.data := jsonb_set(room.data, '{board,elements}', p_elements);
+    room.data := jsonb_set(room.data, '{board,lastEdited}', to_jsonb(now()));
+  elsif p_action = 'end' then
+    room.data := room.data || jsonb_build_object('status', 'ENDED', 'endedAt', now());
+  else raise exception 'Unsupported conference action';
+  end if;
+  update public.conference_rooms set data = room.data, revision = room.revision + 1 where code = p_code;
+  return room.data || jsonb_build_object('revision', room.revision + 1);
+end;
+$$;
+
+revoke all on function public.conference_create(text,text,text) from public;
+revoke all on function public.conference_read(text) from public;
+revoke all on function public.conference_update(text,text,integer,text,jsonb) from public;
+grant execute on function public.conference_create(text,text,text) to anon, authenticated;
+grant execute on function public.conference_read(text) to anon, authenticated;
+grant execute on function public.conference_update(text,text,integer,text,jsonb) to anon, authenticated;

@@ -7,7 +7,6 @@ import React, {
   useEffect,
   useCallback,
   MouseEvent,
-  WheelEvent,
   ChangeEvent,
 } from "react";
 import {
@@ -79,6 +78,8 @@ export function WhiteboardCanvas({
   const readOnly = suppliedReadOnly || (role === "STUDENT" && (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" || submissions.some(s=>s.whiteboardId===initialWhiteboard?.id && ["SUBMITTED","REVIEWED"].includes(s.status)))) || (role === "STUDENT" && !!session && (session.status !== "LIVE" || ((session.studentIds?.length || 1) > 1 && !session.writerIds?.includes(user.id))));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const imageCacheRef = useRef(new Map<string, HTMLImageElement>());
+  const [imageLoadVersion, setImageLoadVersion] = useState(0);
 
   // Whiteboard elements state with undo/redo history
   const [elements, setElements] = useState<WhiteboardElement[]>(
@@ -102,6 +103,15 @@ export function WhiteboardCanvas({
   // Drawing state
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [currentElement, setCurrentElement] = useState<WhiteboardElement | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [draggedElement, setDraggedElement] = useState<{
+    id: string;
+    offsetX: number;
+    offsetY: number;
+    before: WhiteboardElement[];
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
   // Text input overlay state
   const [textInput, setTextInput] = useState<{
@@ -149,7 +159,7 @@ export function WhiteboardCanvas({
     }
   }, [initialWhiteboard?.id]);
 
-  useEffect(() => { if (!isDrawing && initialWhiteboard?.elements) setElements(initialWhiteboard.elements); }, [initialWhiteboard?.elements, isDrawing]);
+  useEffect(() => { if (!isDrawing && !draggedElement && initialWhiteboard?.elements) setElements(initialWhiteboard.elements); }, [initialWhiteboard?.elements, isDrawing, draggedElement]);
 
   // Handle canvas sizing and redraw
   const redrawCanvas = useCallback(() => {
@@ -301,6 +311,27 @@ export function WhiteboardCanvas({
           break;
         }
 
+        case "image": {
+          if (!el.imageUrl) break;
+          let image = imageCacheRef.current.get(el.imageUrl);
+          if (!image) {
+            image = new Image();
+            image.onload = () => setImageLoadVersion((version) => version + 1);
+            image.src = el.imageUrl;
+            imageCacheRef.current.set(el.imageUrl, image);
+          }
+          const imageWidth = el.width || 320;
+          const imageHeight = el.height || 240;
+          if (image.complete && image.naturalWidth) {
+            ctx.drawImage(image, el.x, el.y, imageWidth, imageHeight);
+          }
+          ctx.strokeStyle = el.id === selectedElementId ? "#4f46e5" : "#cbd5e1";
+          ctx.lineWidth = (el.id === selectedElementId ? 2 : 1) / zoom;
+          ctx.setLineDash(el.id === selectedElementId ? [7 / zoom, 5 / zoom] : []);
+          ctx.strokeRect(el.x, el.y, imageWidth, imageHeight);
+          break;
+        }
+
         case "question_card": {
           const qw = el.width || 440;
           const qh = el.height || 100;
@@ -386,11 +417,12 @@ export function WhiteboardCanvas({
     });
 
     ctx.restore();
-  }, [elements, currentElement, pan, zoom]);
+  }, [elements, currentElement, pan, zoom, selectedElementId]);
 
   useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas]);
+    // imageLoadVersion redraws newly decoded clipboard images from the cache.
+    if (imageLoadVersion >= 0) redrawCanvas();
+  }, [redrawCanvas, imageLoadVersion]);
 
   // Window resize handler
   useEffect(() => {
@@ -398,6 +430,81 @@ export function WhiteboardCanvas({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [redrawCanvas]);
+
+  // Prevent trackpad/wheel panning from scrolling the page and moving the toolbar.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handleCanvasWheel = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey || event.metaKey) {
+        const zoomFactor = event.deltaY < 0 ? 1.1 : 0.9;
+        setZoom((previous) => Math.min(3, Math.max(0.4, previous * zoomFactor)));
+      } else {
+        setPan((previous) => ({
+          x: previous.x - event.deltaX,
+          y: previous.y - event.deltaY,
+        }));
+      }
+    };
+    canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleCanvasWheel);
+  }, []);
+
+  // Paste bitmap images into the visible center of the virtual canvas.
+  useEffect(() => {
+    if (readOnly) return;
+    const handlePaste = (event: ClipboardEvent) => {
+      const file = Array.from(event.clipboardData?.items || [])
+        .find((item) => item.kind === "file" && item.type.startsWith("image/"))?.getAsFile();
+      if (!file) return;
+      event.preventDefault();
+      if (file.size > 10 * 1024 * 1024) {
+        window.alert("Paste an image smaller than 10 MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const source = typeof reader.result === "string" ? reader.result : "";
+        const pastedImage = new Image();
+        pastedImage.onload = () => {
+          const maxSide = 1000;
+          const scale = Math.min(1, maxSide / Math.max(pastedImage.naturalWidth, pastedImage.naturalHeight));
+          const pixelWidth = Math.max(1, Math.round(pastedImage.naturalWidth * scale));
+          const pixelHeight = Math.max(1, Math.round(pastedImage.naturalHeight * scale));
+          const buffer = document.createElement("canvas");
+          buffer.width = pixelWidth;
+          buffer.height = pixelHeight;
+          const context = buffer.getContext("2d");
+          if (!context) return;
+          context.drawImage(pastedImage, 0, 0, pixelWidth, pixelHeight);
+          const imageUrl = buffer.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.86);
+          if (imageUrl.length > 1_800_000) {
+            window.alert("This image is too detailed for the shared whiteboard. Paste a smaller image.");
+            return;
+          }
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const displayScale = Math.min(1, 520 / pixelWidth, 380 / pixelHeight);
+          const width = Math.max(80, pixelWidth * displayScale);
+          const height = Math.max(60, pixelHeight * displayScale);
+          const x = (canvas.clientWidth / 2 - pan.x) / zoom - width / 2;
+          const y = (canvas.clientHeight / 2 - pan.y) / zoom - height / 2;
+          const imageElement: WhiteboardElement = {
+            id: crypto.randomUUID(), type: "image", x, y, width, height, imageUrl,
+            strokeColor: "#cbd5e1", strokeWidth: 1,
+          };
+          pushToHistory([...elements, imageElement]);
+          setSelectedElementId(imageElement.id);
+          setActiveTool("select");
+        };
+        pastedImage.src = source;
+      };
+      reader.readAsDataURL(file);
+    };
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [elements, pan.x, pan.y, pushToHistory, readOnly, zoom]);
 
   // Mouse Coordinates converted to Virtual Canvas Coordinates
   const getCanvasCoords = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -425,7 +532,17 @@ export function WhiteboardCanvas({
     }
 
     if (activeTool === "select") {
-      // In select mode, we could detect click on elements
+      const image = [...elements].reverse().find((element) =>
+        element.type === "image" && x >= element.x && x <= element.x + (element.width || 320) &&
+        y >= element.y && y <= element.y + (element.height || 240)
+      );
+      setSelectedElementId(image?.id || null);
+      if (image) {
+        setDraggedElement({
+          id: image.id, offsetX: x - image.x, offsetY: y - image.y,
+          before: elements, currentX: image.x, currentY: image.y,
+        });
+      }
       return;
     }
 
@@ -537,6 +654,17 @@ export function WhiteboardCanvas({
       return;
     }
 
+    if (draggedElement) {
+      const { x, y } = getCanvasCoords(e);
+      const nextX = x - draggedElement.offsetX;
+      const nextY = y - draggedElement.offsetY;
+      setElements((previous) => previous.map((element) => element.id === draggedElement.id
+        ? { ...element, x: nextX, y: nextY }
+        : element));
+      setDraggedElement((previous) => previous ? { ...previous, currentX: nextX, currentY: nextY } : null);
+      return;
+    }
+
     if (!isDrawing || !currentElement) return;
     const { x, y } = getCanvasCoords(e);
 
@@ -575,24 +703,22 @@ export function WhiteboardCanvas({
       return;
     }
 
+    if (draggedElement) {
+      const movedElements = draggedElement.before.map((element) => element.id === draggedElement.id
+        ? { ...element, x: draggedElement.currentX, y: draggedElement.currentY }
+        : element);
+      setElements(movedElements);
+      setHistory((previous) => [...previous.slice(0, historyIndex + 1), movedElements]);
+      setHistoryIndex((previous) => previous + 1);
+      onSave?.(movedElements, draggedElement.before);
+      setDraggedElement(null);
+      return;
+    }
+
     if (isDrawing && currentElement) {
       setIsDrawing(false);
       pushToHistory([...elements, currentElement]);
       setCurrentElement(null);
-    }
-  };
-
-  // Wheel Zoom / Pan
-  const handleWheel = (e: WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      setZoom((prev) => Math.min(3, Math.max(0.4, prev * zoomFactor)));
-    } else {
-      setPan((prev) => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY,
-      }));
     }
   };
 
@@ -691,13 +817,13 @@ export function WhiteboardCanvas({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-full min-h-[480px] flex flex-col bg-white overflow-hidden select-none border border-slate-200 rounded-xl shadow-xs",
+        "relative isolate w-full h-full min-h-[480px] flex flex-col bg-white overflow-hidden overscroll-contain select-none border border-slate-200 rounded-xl shadow-xs",
         className
       )}
     >
       {/* Top Floating Control Toolbar */}
       {!readOnly && (
-        <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
+        <div className="absolute top-4 left-4 z-40 flex max-w-[calc(100%-8rem)] flex-wrap items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
           {/* Tool Selector Buttons */}
           <button
             title="Select & Move (V)"
@@ -924,7 +1050,7 @@ export function WhiteboardCanvas({
       )}
 
       {/* Top Right Action Tools (Undo/Redo, Zoom, PDF/PNG Export) */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
+      <div className="absolute top-4 right-4 z-40 flex items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
         {!readOnly && (
           <>
             <button
@@ -1012,11 +1138,11 @@ export function WhiteboardCanvas({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onWheel={handleWheel}
+        onMouseLeave={handleMouseUp}
         className={cn(
-          "w-full h-full flex-1 bg-grid-dots bg-[#fafbfd] touch-none cursor-crosshair",
+          "w-full h-full min-h-0 flex-1 bg-grid-dots bg-[#fafbfd] touch-none cursor-crosshair",
           activeTool === "pan" && "cursor-grab active:cursor-grabbing",
-          activeTool === "select" && "cursor-default",
+          activeTool === "select" && (draggedElement ? "cursor-grabbing" : "cursor-grab"),
           activeTool === "eraser" && "cursor-pointer"
         )}
       />
