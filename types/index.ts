@@ -123,7 +123,6 @@ export interface WhiteboardElement {
   stampType?: "correct" | "incorrect" | "review" | "star";
   questionNumber?: number;
   questionText?: string;
-  imageUrl?: string;
   authorRole?: UserRole;
   authorName?: string;
   timestamp?: number;

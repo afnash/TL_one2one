@@ -40,7 +40,6 @@ import {
   FileDown,
   Sparkles,
   Image as ImageIcon,
-  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +79,7 @@ export function WhiteboardCanvas({
   const readOnly = suppliedReadOnly || (role === "STUDENT" && (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" || submissions.some(s=>s.whiteboardId===initialWhiteboard?.id && ["SUBMITTED","REVIEWED"].includes(s.status)))) || (role === "STUDENT" && !!session && (session.status !== "LIVE" || ((session.studentIds?.length || 1) > 1 && !session.writerIds?.includes(user.id))));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageCacheRef = useRef(new Map<string, HTMLImageElement>());
   const [imageLoadVersion, setImageLoadVersion] = useState(0);
 
@@ -151,6 +151,59 @@ export function WhiteboardCanvas({
     },
     [historyIndex, notifySave]
   );
+
+  const addImageFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 10 * 1024 * 1024) {
+      window.alert("Choose an image smaller than 10 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const source = typeof reader.result === "string" ? reader.result : "";
+      const pastedImage = new Image();
+      pastedImage.onload = () => {
+        const maxSide = 1000;
+        const scale = Math.min(1, maxSide / Math.max(pastedImage.naturalWidth, pastedImage.naturalHeight));
+        const pixelWidth = Math.max(1, Math.round(pastedImage.naturalWidth * scale));
+        const pixelHeight = Math.max(1, Math.round(pastedImage.naturalHeight * scale));
+        const buffer = document.createElement("canvas");
+        buffer.width = pixelWidth;
+        buffer.height = pixelHeight;
+        const context = buffer.getContext("2d");
+        if (!context) return;
+        context.drawImage(pastedImage, 0, 0, pixelWidth, pixelHeight);
+        const imageUrl = buffer.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.86);
+        if (imageUrl.length > 1_800_000) {
+          window.alert("This image is too detailed for the shared whiteboard. Choose a smaller image.");
+          return;
+        }
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const displayScale = Math.min(1, 520 / pixelWidth, 380 / pixelHeight);
+        const width = Math.max(80, pixelWidth * displayScale);
+        const height = Math.max(60, pixelHeight * displayScale);
+        const x = (canvas.clientWidth / 2 - pan.x) / zoom - width / 2;
+        const y = (canvas.clientHeight / 2 - pan.y) / zoom - height / 2;
+        const imageElement: WhiteboardElement = {
+          id: crypto.randomUUID(), type: "image", x, y, width, height, imageUrl,
+          strokeColor: "#cbd5e1", strokeWidth: 1,
+        };
+        pushToHistory([...elements, imageElement]);
+        setSelectedElementId(imageElement.id);
+        setActiveTool("select");
+      };
+      pastedImage.onerror = () => window.alert("The selected image could not be read.");
+      pastedImage.src = source;
+    };
+    reader.readAsDataURL(file);
+  }, [elements, pan.x, pan.y, pushToHistory, zoom]);
+
+  const handleImageFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) addImageFile(file);
+    event.target.value = "";
+  };
 
   // Sync with initial whiteboard when changed
   useEffect(() => {
@@ -414,30 +467,6 @@ export function WhiteboardCanvas({
           break;
         }
 
-        case "image": {
-          const src = el.imageUrl || el.text;
-          if (!src) break;
-          let img = imageCache.current.get(src);
-          if (!img) {
-            img = new Image();
-            img.src = src;
-            img.onload = () => {
-              redrawCanvas();
-            };
-            imageCache.current.set(src, img);
-          }
-          const w = el.width || 300;
-          const h = el.height || 200;
-          if (img.complete && img.naturalWidth !== 0) {
-            ctx.drawImage(img, el.x, el.y, w, h);
-          } else {
-            ctx.strokeStyle = "#cbd5e1";
-            ctx.fillStyle = "#f8fafc";
-            ctx.fillRect(el.x, el.y, w, h);
-            ctx.strokeRect(el.x, el.y, w, h);
-          }
-          break;
-        }
       }
 
       ctx.restore();
@@ -486,52 +515,11 @@ export function WhiteboardCanvas({
         .find((item) => item.kind === "file" && item.type.startsWith("image/"))?.getAsFile();
       if (!file) return;
       event.preventDefault();
-      if (file.size > 10 * 1024 * 1024) {
-        window.alert("Paste an image smaller than 10 MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const source = typeof reader.result === "string" ? reader.result : "";
-        const pastedImage = new Image();
-        pastedImage.onload = () => {
-          const maxSide = 1000;
-          const scale = Math.min(1, maxSide / Math.max(pastedImage.naturalWidth, pastedImage.naturalHeight));
-          const pixelWidth = Math.max(1, Math.round(pastedImage.naturalWidth * scale));
-          const pixelHeight = Math.max(1, Math.round(pastedImage.naturalHeight * scale));
-          const buffer = document.createElement("canvas");
-          buffer.width = pixelWidth;
-          buffer.height = pixelHeight;
-          const context = buffer.getContext("2d");
-          if (!context) return;
-          context.drawImage(pastedImage, 0, 0, pixelWidth, pixelHeight);
-          const imageUrl = buffer.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.86);
-          if (imageUrl.length > 1_800_000) {
-            window.alert("This image is too detailed for the shared whiteboard. Paste a smaller image.");
-            return;
-          }
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-          const displayScale = Math.min(1, 520 / pixelWidth, 380 / pixelHeight);
-          const width = Math.max(80, pixelWidth * displayScale);
-          const height = Math.max(60, pixelHeight * displayScale);
-          const x = (canvas.clientWidth / 2 - pan.x) / zoom - width / 2;
-          const y = (canvas.clientHeight / 2 - pan.y) / zoom - height / 2;
-          const imageElement: WhiteboardElement = {
-            id: crypto.randomUUID(), type: "image", x, y, width, height, imageUrl,
-            strokeColor: "#cbd5e1", strokeWidth: 1,
-          };
-          pushToHistory([...elements, imageElement]);
-          setSelectedElementId(imageElement.id);
-          setActiveTool("select");
-        };
-        pastedImage.src = source;
-      };
-      reader.readAsDataURL(file);
+      addImageFile(file);
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [elements, pan.x, pan.y, pushToHistory, readOnly, zoom]);
+  }, [addImageFile, readOnly]);
 
   // Mouse Coordinates converted to Virtual Canvas Coordinates
   const getCanvasCoords = (e: MouseEvent<HTMLCanvasElement>) => {
