@@ -118,6 +118,7 @@ export interface WhiteboardElement {
   strokeWidth: number;
   fillColor?: string;
   text?: string;
+  imageUrl?: string;
   fontSize?: number;
   stampType?: "correct" | "incorrect" | "review" | "star";
   questionNumber?: number;

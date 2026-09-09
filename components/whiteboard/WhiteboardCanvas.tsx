@@ -39,6 +39,8 @@ import {
   Download,
   FileDown,
   Sparkles,
+  Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -408,6 +410,31 @@ export function WhiteboardCanvas({
             ctx.font = "bold 16px 'Inter', sans-serif";
             ctx.fillStyle = "#ffffff";
             ctx.fillText("★", el.x + 10, el.y + 22);
+          }
+          break;
+        }
+
+        case "image": {
+          const src = el.imageUrl || el.text;
+          if (!src) break;
+          let img = imageCache.current.get(src);
+          if (!img) {
+            img = new Image();
+            img.src = src;
+            img.onload = () => {
+              redrawCanvas();
+            };
+            imageCache.current.set(src, img);
+          }
+          const w = el.width || 300;
+          const h = el.height || 200;
+          if (img.complete && img.naturalWidth !== 0) {
+            ctx.drawImage(img, el.x, el.y, w, h);
+          } else {
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(el.x, el.y, w, h);
+            ctx.strokeRect(el.x, el.y, w, h);
           }
           break;
         }
@@ -950,6 +977,22 @@ export function WhiteboardCanvas({
           >
             <StickyNote className="w-4 h-4" />
           </button>
+
+          <button
+            title="Upload Image (or Paste directly via Ctrl+V)"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100 text-slate-700 hover:text-indigo-600"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageFileSelect}
+            accept="image/*"
+            className="hidden"
+          />
 
           {/* Teacher Grading & Annotation Stamps */}
           {showTeacherTools && (

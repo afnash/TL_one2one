@@ -16,6 +16,7 @@ import {
   FileCheck,
   Search,
   Filter,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -113,13 +114,20 @@ export default function TeacherAssignmentsPage() {
                     </div>
                   </div>
 
-                  {/* Submissions count badge */}
+                  {/* Submissions count badge & Edit Button */}
                   <div className="flex items-center gap-2 shrink-0">
                     {pendingReviews.length > 0 && (
                       <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold rounded-xl animate-pulse">
                         {pendingReviews.length} To Mark
                       </span>
                     )}
+                    <Link
+                      href={`/teacher/assignments/${asg.id}/edit`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl transition-colors shadow-2xs"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Edit Tasks & Board</span>
+                    </Link>
                   </div>
                 </div>
 
