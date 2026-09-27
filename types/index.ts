@@ -28,6 +28,8 @@ export interface Teacher {
 }
 
 export interface Student {
+  parentContact?: ReportContact;
+  managerContact?: ReportContact;
   phone?: string;
   id: string;
   name: string;
@@ -62,6 +64,7 @@ export interface Subject {
 export type SessionStatus = "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED";
 
 export interface Session {
+  mediaState?: Record<string, { cameraOn: boolean; micOn: boolean }>;
   codeDocument?: import("@/lib/coding").CodeDocument;
   codeEditorId?: string;
   codeRun?: import("@/lib/coding").CodeRun;
@@ -222,6 +225,23 @@ export interface StudyMaterial {
   downloadsCount: number;
 }
 
+export interface ReportContact {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface StudentTimetableEntry {
+  sessionId: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  subject: string;
+  topic: string;
+  tutorName: string;
+  status: SessionStatus;
+}
+
 export interface SessionReport {
   id: string;
   sessionId: string;
@@ -242,6 +262,29 @@ export interface SessionReport {
   studentPerformanceNotes: string;
   teacherNotes: string;
   nextSessionPlan: string;
+  completionStatus?: "COMPLETED" | "PARTIAL";
+  partialReason?: string;
+  studentEmail?: string;
+  studentPhone?: string;
+  studentGrade?: string;
+  parentContact?: ReportContact;
+  tutorContact?: ReportContact;
+  managerContact?: ReportContact;
+  workCompleted?: string;
+  classOverview?: string;
+  remarks?: string;
+  previousHomework?: string;
+  homeworkStatus?: "NOT_SET" | "NOT_STARTED" | "PARTIAL" | "COMPLETED" | "NOT_CHECKED";
+  testName?: string;
+  testMarks?: number | null;
+  testMaxMarks?: number | null;
+  nextTestDate?: string;
+  nextTestTime?: string;
+  nextTestDetails?: string;
+  timetable?: StudentTimetableEntry[];
+  technicalIssuesOccurred?: boolean;
+  technicalIssueDescription?: string;
+  technicalIssueImpact?: string;
   status?: "DRAFT" | "SAVED";
   createdAt: string;
 }

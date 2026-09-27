@@ -45,9 +45,9 @@ export function WhiteboardWorkspace({
   }
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col gap-3", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col gap-1.5", className)}>
       {showSelector && (
-        <div className="glass-card flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3">
+        <div className="glass-card flex flex-wrap items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 shrink-0">
           <StudentBoardSelector
             currentWhiteboardId={activeBoard.id}
             onSelectBoard={setActiveBoardId}
@@ -55,10 +55,10 @@ export function WhiteboardWorkspace({
             onSelectStudent={setSelectedStudentId}
             isTeacherMode={isTeacher}
           />
-          <span className="hidden text-xs font-medium text-slate-500 sm:inline">Shared board ? syncs every 2 seconds</span>
+          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Shared board • auto-syncs live</span>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
         <WhiteboardCanvas
           key={activeBoard.id}
           initialWhiteboard={activeBoard}

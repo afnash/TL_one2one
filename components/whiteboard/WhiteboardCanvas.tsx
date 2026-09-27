@@ -40,6 +40,12 @@ import {
   FileDown,
   Sparkles,
   Image as ImageIcon,
+  Maximize,
+  Minimize,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +71,9 @@ const COLOR_PALETTE = [
 ];
 
 const STROKE_WIDTHS = [2, 4, 8, 14];
+const VIRTUAL_BOUND_MIN = -5000;
+const VIRTUAL_BOUND_MAX = 5000;
+const VIRTUAL_SPAN = VIRTUAL_BOUND_MAX - VIRTUAL_BOUND_MIN;
 
 export function WhiteboardCanvas({
   initialWhiteboard,
@@ -75,10 +84,27 @@ export function WhiteboardCanvas({
   className,
 }: WhiteboardCanvasProps) {
   const { user, role, sessions, submissions, saving, connectionError } = useLMS();
-  const session = sessions.find(s => s.whiteboardId === initialWhiteboard?.id);
-  const readOnly = suppliedReadOnly || (role === "STUDENT" && (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" || submissions.some(s=>s.whiteboardId===initialWhiteboard?.id && ["SUBMITTED","REVIEWED"].includes(s.status)))) || (role === "STUDENT" && !!session && (session.status !== "LIVE" || ((session.studentIds?.length || 1) > 1 && !session.writerIds?.includes(user.id))));
+  const session = sessions.find((s) => s.whiteboardId === initialWhiteboard?.id);
+  const readOnly =
+    suppliedReadOnly ||
+    (role === "STUDENT" &&
+      (initialWhiteboard?.category === "ASSIGNMENT_QUESTION" ||
+        submissions.some(
+          (s) =>
+            s.whiteboardId === initialWhiteboard?.id &&
+            ["SUBMITTED", "REVIEWED"].includes(s.status)
+        ))) ||
+    (role === "STUDENT" &&
+      !!session &&
+      (session.status !== "LIVE" ||
+        ((session.studentIds?.length || 1) > 1 &&
+          !session.writerIds?.includes(user.id))));
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const hTrackRef = useRef<HTMLDivElement | null>(null);
+  const vTrackRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageCacheRef = useRef(new Map<string, HTMLImageElement>());
   const [imageLoadVersion, setImageLoadVersion] = useState(0);
@@ -96,11 +122,19 @@ export function WhiteboardCanvas({
   const [activeStrokeWidth, setActiveStrokeWidth] = useState<number>(3);
   const [activeStamp, setActiveStamp] = useState<"correct" | "incorrect" | "review" | "star">("correct");
 
+  // Popover state for compact menus
+  const [openMenu, setOpenMenu] = useState<"shape" | "style" | "stamp" | "actions" | null>(null);
+
   // Pan & Zoom state
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Scrollbar dragging state
+  const [isDraggingHScroll, setIsDraggingHScroll] = useState(false);
+  const [isDraggingVScroll, setIsDraggingVScroll] = useState(false);
 
   // Drawing state
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -186,8 +220,15 @@ export function WhiteboardCanvas({
         const x = (canvas.clientWidth / 2 - pan.x) / zoom - width / 2;
         const y = (canvas.clientHeight / 2 - pan.y) / zoom - height / 2;
         const imageElement: WhiteboardElement = {
-          id: crypto.randomUUID(), type: "image", x, y, width, height, imageUrl,
-          strokeColor: "#cbd5e1", strokeWidth: 1,
+          id: crypto.randomUUID(),
+          type: "image",
+          x,
+          y,
+          width,
+          height,
+          imageUrl,
+          strokeColor: "#cbd5e1",
+          strokeWidth: 1,
         };
         pushToHistory([...elements, imageElement]);
         setSelectedElementId(imageElement.id);
@@ -214,7 +255,11 @@ export function WhiteboardCanvas({
     }
   }, [initialWhiteboard?.id]);
 
-  useEffect(() => { if (!isDrawing && !draggedElement && initialWhiteboard?.elements) setElements(initialWhiteboard.elements); }, [initialWhiteboard?.elements, isDrawing, draggedElement]);
+  useEffect(() => {
+    if (!isDrawing && !draggedElement && initialWhiteboard?.elements) {
+      setElements(initialWhiteboard.elements);
+    }
+  }, [initialWhiteboard?.elements, isDrawing, draggedElement]);
 
   // Handle canvas sizing and redraw
   const redrawCanvas = useCallback(() => {
@@ -293,7 +338,6 @@ export function WhiteboardCanvas({
           ctx.lineTo(to.x, to.y);
           ctx.stroke();
 
-          // Draw arrowhead
           const headlen = 14;
           const angle = Math.atan2(to.y - from.y, to.x - from.x);
           ctx.beginPath();
@@ -341,7 +385,6 @@ export function WhiteboardCanvas({
         }
 
         case "sticky": {
-          // Sticky note container
           ctx.fillStyle = el.fillColor || "#fef3c7";
           ctx.strokeStyle = el.strokeColor || "#f59e0b";
           ctx.lineWidth = 1;
@@ -350,11 +393,9 @@ export function WhiteboardCanvas({
           ctx.fillRect(el.x, el.y, sw, sh);
           ctx.strokeRect(el.x, el.y, sw, sh);
 
-          // Header tape / pin
           ctx.fillStyle = "rgba(0,0,0,0.06)";
           ctx.fillRect(el.x, el.y, sw, 20);
 
-          // Content
           if (el.text) {
             ctx.font = "14px 'Inter', sans-serif";
             ctx.fillStyle = "#1e293b";
@@ -390,7 +431,6 @@ export function WhiteboardCanvas({
         case "question_card": {
           const qw = el.width || 440;
           const qh = el.height || 100;
-          // Card background
           ctx.fillStyle = "#ffffff";
           ctx.strokeStyle = "#e2e8f0";
           ctx.lineWidth = 1.5;
@@ -399,16 +439,13 @@ export function WhiteboardCanvas({
           ctx.fill();
           ctx.stroke();
 
-          // Left indicator bar
           ctx.fillStyle = el.strokeColor || "#4f46e5";
           ctx.fillRect(el.x, el.y, 6, qh);
 
-          // Header
           ctx.font = "bold 13px 'Inter', sans-serif";
           ctx.fillStyle = el.strokeColor || "#4f46e5";
           ctx.fillText(`QUESTION ${el.questionNumber || 1}`, el.x + 18, el.y + 26);
 
-          // Question Prompt
           ctx.font = "500 14px 'Inter', sans-serif";
           ctx.fillStyle = "#0f172a";
           if (el.questionText) {
@@ -466,7 +503,6 @@ export function WhiteboardCanvas({
           }
           break;
         }
-
       }
 
       ctx.restore();
@@ -476,18 +512,53 @@ export function WhiteboardCanvas({
   }, [elements, currentElement, pan, zoom, selectedElementId]);
 
   useEffect(() => {
-    // imageLoadVersion redraws newly decoded clipboard images from the cache.
     if (imageLoadVersion >= 0) redrawCanvas();
   }, [redrawCanvas, imageLoadVersion]);
 
-  // Window resize handler
+  // Window resize handler & ResizeObserver
   useEffect(() => {
     const handleResize = () => redrawCanvas();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [redrawCanvas]);
 
-  // Prevent trackpad/wheel panning from scrolling the page and moving the toolbar.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => {
+      redrawCanvas();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [redrawCanvas]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+      requestAnimationFrame(redrawCanvas);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [redrawCanvas]);
+
+  // Close menus when clicking outside toolbar
+  useEffect(() => {
+    const handleOutsideClick = (e: globalThis.MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement === containerRef.current) await document.exitFullscreen();
+    else await containerRef.current.requestFullscreen();
+  };
+
+  // Prevent trackpad/wheel panning from scrolling the page
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -507,12 +578,13 @@ export function WhiteboardCanvas({
     return () => canvas.removeEventListener("wheel", handleCanvasWheel);
   }, []);
 
-  // Paste bitmap images into the visible center of the virtual canvas.
+  // Paste bitmap images into canvas center
   useEffect(() => {
     if (readOnly) return;
     const handlePaste = (event: ClipboardEvent) => {
       const file = Array.from(event.clipboardData?.items || [])
-        .find((item) => item.kind === "file" && item.type.startsWith("image/"))?.getAsFile();
+        .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+        ?.getAsFile();
       if (!file) return;
       event.preventDefault();
       addImageFile(file);
@@ -539,7 +611,6 @@ export function WhiteboardCanvas({
     if (readOnly) return;
     const { x, y } = getCanvasCoords(e);
 
-    // Pan mode or Middle mouse button
     if (activeTool === "pan" || e.button === 1) {
       setIsPanning(true);
       setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -547,15 +618,23 @@ export function WhiteboardCanvas({
     }
 
     if (activeTool === "select") {
-      const image = [...elements].reverse().find((element) =>
-        element.type === "image" && x >= element.x && x <= element.x + (element.width || 320) &&
-        y >= element.y && y <= element.y + (element.height || 240)
+      const image = [...elements].reverse().find(
+        (element) =>
+          element.type === "image" &&
+          x >= element.x &&
+          x <= element.x + (element.width || 320) &&
+          y >= element.y &&
+          y <= element.y + (element.height || 240)
       );
       setSelectedElementId(image?.id || null);
       if (image) {
         setDraggedElement({
-          id: image.id, offsetX: x - image.x, offsetY: y - image.y,
-          before: elements, currentX: image.x, currentY: image.y,
+          id: image.id,
+          offsetX: x - image.x,
+          offsetY: y - image.y,
+          before: elements,
+          currentX: image.x,
+          currentY: image.y,
         });
       }
       return;
@@ -603,7 +682,6 @@ export function WhiteboardCanvas({
     }
 
     if (activeTool === "eraser") {
-      // Find element closest to click point to delete
       const filtered = elements.filter((el) => {
         if (el.points && el.points.length > 0) {
           return !el.points.some(
@@ -673,10 +751,16 @@ export function WhiteboardCanvas({
       const { x, y } = getCanvasCoords(e);
       const nextX = x - draggedElement.offsetX;
       const nextY = y - draggedElement.offsetY;
-      setElements((previous) => previous.map((element) => element.id === draggedElement.id
-        ? { ...element, x: nextX, y: nextY }
-        : element));
-      setDraggedElement((previous) => previous ? { ...previous, currentX: nextX, currentY: nextY } : null);
+      setElements((previous) =>
+        previous.map((element) =>
+          element.id === draggedElement.id
+            ? { ...element, x: nextX, y: nextY }
+            : element
+        )
+      );
+      setDraggedElement((previous) =>
+        previous ? { ...previous, currentX: nextX, currentY: nextY } : null
+      );
       return;
     }
 
@@ -719,11 +803,16 @@ export function WhiteboardCanvas({
     }
 
     if (draggedElement) {
-      const movedElements = draggedElement.before.map((element) => element.id === draggedElement.id
-        ? { ...element, x: draggedElement.currentX, y: draggedElement.currentY }
-        : element);
+      const movedElements = draggedElement.before.map((element) =>
+        element.id === draggedElement.id
+          ? { ...element, x: draggedElement.currentX, y: draggedElement.currentY }
+          : element
+      );
       setElements(movedElements);
-      setHistory((previous) => [...previous.slice(0, historyIndex + 1), movedElements]);
+      setHistory((previous) => [
+        ...previous.slice(0, historyIndex + 1),
+        movedElements,
+      ]);
       setHistoryIndex((previous) => previous + 1);
       onSave?.(movedElements, draggedElement.before);
       setDraggedElement(null);
@@ -785,6 +874,7 @@ export function WhiteboardCanvas({
 
   // Export as PNG
   const handleExportPNG = () => {
+    setOpenMenu(null);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
@@ -794,8 +884,9 @@ export function WhiteboardCanvas({
     a.click();
   };
 
-  // Export as PDF (Vector print simulation)
+  // Export as PDF
   const handleExportPDF = () => {
+    setOpenMenu(null);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const printWindow = window.open("", "_blank");
@@ -828,339 +919,536 @@ export function WhiteboardCanvas({
     printWindow.document.close();
   };
 
+  const isShapeTool = ["rectangle", "circle", "line", "arrow"].includes(activeTool);
+  const getShapeIcon = () => {
+    switch (activeTool) {
+      case "circle": return <CircleIcon className="w-3.5 h-3.5" />;
+      case "line": return <Minus className="w-3.5 h-3.5" />;
+      case "arrow": return <MoveRight className="w-3.5 h-3.5" />;
+      default: return <Square className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const getStampIcon = () => {
+    switch (activeStamp) {
+      case "incorrect": return <XCircle className="w-3.5 h-3.5 text-rose-600" />;
+      case "review": return <AlertCircle className="w-3.5 h-3.5 text-amber-600" />;
+      case "star": return <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />;
+      default: return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />;
+    }
+  };
+
+  // --- Normal Standard Scrollbar Handlers ---
+  const currentVirtualX = -pan.x / zoom;
+  const currentVirtualY = -pan.y / zoom;
+
+  const hRatio = Math.max(0, Math.min(1, (currentVirtualX - VIRTUAL_BOUND_MIN) / VIRTUAL_SPAN));
+  const vRatio = Math.max(0, Math.min(1, (currentVirtualY - VIRTUAL_BOUND_MIN) / VIRTUAL_SPAN));
+
+  const scrollByDelta = (dx: number, dy: number) => {
+    setPan((prev) => ({
+      x: prev.x - dx * zoom,
+      y: prev.y - dy * zoom,
+    }));
+  };
+
+  const handleHTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hTrackRef.current) return;
+    const rect = hTrackRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetVirtualX = VIRTUAL_BOUND_MIN + ratio * VIRTUAL_SPAN;
+    setPan((prev) => ({ ...prev, x: -targetVirtualX * zoom }));
+    setIsDraggingHScroll(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleHTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingHScroll || !hTrackRef.current) return;
+    const rect = hTrackRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetVirtualX = VIRTUAL_BOUND_MIN + ratio * VIRTUAL_SPAN;
+    setPan((prev) => ({ ...prev, x: -targetVirtualX * zoom }));
+  };
+
+  const handleHTrackPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsDraggingHScroll(false);
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleVTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!vTrackRef.current) return;
+    const rect = vTrackRef.current.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    const ratio = Math.max(0, Math.min(1, clickY / rect.height));
+    const targetVirtualY = VIRTUAL_BOUND_MIN + ratio * VIRTUAL_SPAN;
+    setPan((prev) => ({ ...prev, y: -targetVirtualY * zoom }));
+    setIsDraggingVScroll(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleVTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingVScroll || !vTrackRef.current) return;
+    const rect = vTrackRef.current.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    const ratio = Math.max(0, Math.min(1, clickY / rect.height));
+    const targetVirtualY = VIRTUAL_BOUND_MIN + ratio * VIRTUAL_SPAN;
+    setPan((prev) => ({ ...prev, y: -targetVirtualY * zoom }));
+  };
+
+  const handleVTrackPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsDraggingVScroll(false);
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        "relative isolate w-full h-full min-h-[480px] flex flex-col bg-white overflow-hidden overscroll-contain select-none border border-slate-200 rounded-xl shadow-xs",
+        "relative isolate h-full min-h-0 w-full flex flex-col overflow-hidden overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xs select-none fullscreen:rounded-none fullscreen:border-0",
         className
       )}
     >
-      {/* Top Floating Control Toolbar */}
-      {!readOnly && (
-        <div className="absolute top-4 left-4 z-40 flex max-w-[calc(100%-8rem)] flex-wrap items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
-          {/* Tool Selector Buttons */}
-          <button
-            title="Select & Move (V)"
-            onClick={() => setActiveTool("select")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "select" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <MousePointer className="w-4 h-4" />
-          </button>
+      {/* Top Floating Controls Container */}
+      <div ref={toolbarRef} className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start justify-between gap-2">
+        {/* Compact Drawing Toolbar */}
+        {!readOnly && (
+          <div className="pointer-events-auto flex flex-wrap items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-sm backdrop-blur-md text-slate-700">
+            {/* Select & Move */}
+            <button
+              title="Select & Move (V)"
+              aria-label="Select & Move"
+              onClick={() => { setActiveTool("select"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "select" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <MousePointer className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Hand / Pan Infinite Canvas (H)"
-            onClick={() => setActiveTool("pan")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "pan" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Hand className="w-4 h-4" />
-          </button>
+            {/* Pan Hand */}
+            <button
+              title="Pan Canvas (H)"
+              aria-label="Pan Canvas"
+              onClick={() => { setActiveTool("pan"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "pan" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <Hand className="w-3.5 h-3.5" />
+            </button>
 
-          <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
+            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
 
-          <button
-            title="Pen (P)"
-            onClick={() => setActiveTool("pen")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "pen" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
+            {/* Pen Tool */}
+            <button
+              title="Pen (P)"
+              aria-label="Pen"
+              onClick={() => { setActiveTool("pen"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "pen" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Highlighter"
-            onClick={() => setActiveTool("highlighter")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "highlighter" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Highlighter className="w-4 h-4" />
-          </button>
+            {/* Highlighter */}
+            <button
+              title="Highlighter"
+              aria-label="Highlighter"
+              onClick={() => { setActiveTool("highlighter"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "highlighter" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <Highlighter className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Eraser (E)"
-            onClick={() => setActiveTool("eraser")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "eraser" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Eraser className="w-4 h-4" />
-          </button>
+            {/* Eraser */}
+            <button
+              title="Eraser (E)"
+              aria-label="Eraser"
+              onClick={() => { setActiveTool("eraser"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "eraser" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <Eraser className="w-3.5 h-3.5" />
+            </button>
 
-          <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
+            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
 
-          {/* Shapes */}
-          <button
-            title="Line"
-            onClick={() => setActiveTool("line")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "line" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Minus className="w-4 h-4" />
-          </button>
+            {/* Shapes Dropdown */}
+            <div className="relative">
+              <button
+                title="Shapes (Rectangle, Circle, Line, Arrow)"
+                aria-label="Shapes"
+                onClick={() => setOpenMenu(openMenu === "shape" ? null : "shape")}
+                className={cn(
+                  "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-slate-100",
+                  isShapeTool && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                )}
+              >
+                {getShapeIcon()}
+                <span className="text-[9px] text-slate-400">▼</span>
+              </button>
 
-          <button
-            title="Arrow"
-            onClick={() => setActiveTool("arrow")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "arrow" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <MoveRight className="w-4 h-4" />
-          </button>
+              {openMenu === "shape" && (
+                <div className="absolute top-full left-0 mt-1 flex flex-col gap-0.5 p-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95 min-w-[130px]">
+                  <button
+                    onClick={() => { setActiveTool("rectangle"); setOpenMenu(null); }}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
+                      activeTool === "rectangle" && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Square className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Rectangle</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("circle"); setOpenMenu(null); }}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
+                      activeTool === "circle" && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <CircleIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Circle</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("line"); setOpenMenu(null); }}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
+                      activeTool === "line" && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Minus className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Straight Line</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTool("arrow"); setOpenMenu(null); }}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
+                      activeTool === "arrow" && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <MoveRight className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Arrow</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
-          <button
-            title="Rectangle"
-            onClick={() => setActiveTool("rectangle")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "rectangle" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Square className="w-4 h-4" />
-          </button>
+            {/* Text Box */}
+            <button
+              title="Text Box"
+              aria-label="Text Box"
+              onClick={() => { setActiveTool("text"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "text" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <Type className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Circle"
-            onClick={() => setActiveTool("circle")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "circle" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <CircleIcon className="w-4 h-4" />
-          </button>
+            {/* Sticky Note */}
+            <button
+              title="Sticky Note"
+              aria-label="Sticky Note"
+              onClick={() => { setActiveTool("sticky"); setOpenMenu(null); }}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
+                activeTool === "sticky" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+              )}
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Text Box"
-            onClick={() => setActiveTool("text")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "text" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <Type className="w-4 h-4" />
-          </button>
+            {/* Upload Image */}
+            <button
+              title="Upload Image (or Ctrl+V to paste)"
+              aria-label="Upload Image"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-700 hover:text-indigo-600"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+            </button>
 
-          <button
-            title="Sticky Note"
-            onClick={() => setActiveTool("sticky")}
-            className={cn(
-              "p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100",
-              activeTool === "sticky" && "bg-indigo-50 text-indigo-600 font-semibold shadow-xs"
-            )}
-          >
-            <StickyNote className="w-4 h-4" />
-          </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageFileSelect}
+              accept="image/*"
+              className="hidden"
+            />
 
-          <button
-            title="Upload Image (or Paste directly via Ctrl+V)"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-lg transition-all flex items-center justify-center hover:bg-slate-100 text-slate-700 hover:text-indigo-600"
-          >
-            <ImageIcon className="w-4 h-4" />
-          </button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageFileSelect}
-            accept="image/*"
-            className="hidden"
-          />
-
-          {/* Teacher Grading & Annotation Stamps */}
-          {showTeacherTools && (
-            <>
-              <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
-              <div className="flex items-center gap-1 bg-slate-50 px-1 py-0.5 rounded-lg border border-slate-200">
+            {/* Teacher Stamps Popover */}
+            {showTeacherTools && (
+              <div className="relative">
                 <button
-                  title="Correct Mark Stamp (✓)"
-                  onClick={() => {
-                    setActiveTool("stamp");
-                    setActiveStamp("correct");
-                  }}
+                  title="Grading Stamps (✓, ✗, !, ★)"
+                  aria-label="Teacher Stamps"
+                  onClick={() => setOpenMenu(openMenu === "stamp" ? null : "stamp")}
                   className={cn(
-                    "p-1.5 rounded transition-all text-emerald-600 hover:bg-emerald-50",
-                    activeTool === "stamp" && activeStamp === "correct" && "bg-emerald-100 font-bold ring-1 ring-emerald-400"
+                    "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-slate-100",
+                    activeTool === "stamp" && "bg-amber-50 text-amber-600 font-semibold shadow-2xs"
                   )}
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  {getStampIcon()}
+                  <span className="text-[9px] text-slate-400">▼</span>
                 </button>
-                <button
-                  title="Incorrect Mark Stamp (✗)"
-                  onClick={() => {
-                    setActiveTool("stamp");
-                    setActiveStamp("incorrect");
-                  }}
-                  className={cn(
-                    "p-1.5 rounded transition-all text-rose-600 hover:bg-rose-50",
-                    activeTool === "stamp" && activeStamp === "incorrect" && "bg-rose-100 font-bold ring-1 ring-rose-400"
-                  )}
-                >
-                  <XCircle className="w-4 h-4" />
-                </button>
-                <button
-                  title="Needs Review Stamp (!)"
-                  onClick={() => {
-                    setActiveTool("stamp");
-                    setActiveStamp("review");
-                  }}
-                  className={cn(
-                    "p-1.5 rounded transition-all text-amber-600 hover:bg-amber-50",
-                    activeTool === "stamp" && activeStamp === "review" && "bg-amber-100 font-bold ring-1 ring-amber-400"
-                  )}
-                >
-                  <AlertCircle className="w-4 h-4" />
-                </button>
-                <button
-                  title="Star Stamp (★)"
-                  onClick={() => {
-                    setActiveTool("stamp");
-                    setActiveStamp("star");
-                  }}
-                  className={cn(
-                    "p-1.5 rounded transition-all text-yellow-500 hover:bg-yellow-50",
-                    activeTool === "stamp" && activeStamp === "star" && "bg-yellow-100 font-bold ring-1 ring-yellow-400"
-                  )}
-                >
-                  <Star className="w-4 h-4 fill-current" />
-                </button>
+
+                {openMenu === "stamp" && (
+                  <div className="absolute top-full left-0 mt-1 flex items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95">
+                    <button
+                      title="Correct Mark Stamp (✓)"
+                      onClick={() => {
+                        setActiveTool("stamp");
+                        setActiveStamp("correct");
+                        setOpenMenu(null);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all text-emerald-600 hover:bg-emerald-50",
+                        activeTool === "stamp" && activeStamp === "correct" && "bg-emerald-100 ring-1 ring-emerald-400"
+                      )}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      title="Incorrect Mark Stamp (✗)"
+                      onClick={() => {
+                        setActiveTool("stamp");
+                        setActiveStamp("incorrect");
+                        setOpenMenu(null);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all text-rose-600 hover:bg-rose-50",
+                        activeTool === "stamp" && activeStamp === "incorrect" && "bg-rose-100 ring-1 ring-rose-400"
+                      )}
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                    <button
+                      title="Needs Review Stamp (!)"
+                      onClick={() => {
+                        setActiveTool("stamp");
+                        setActiveStamp("review");
+                        setOpenMenu(null);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all text-amber-600 hover:bg-amber-50",
+                        activeTool === "stamp" && activeStamp === "review" && "bg-amber-100 ring-1 ring-amber-400"
+                      )}
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                    </button>
+                    <button
+                      title="Star Stamp (★)"
+                      onClick={() => {
+                        setActiveTool("stamp");
+                        setActiveStamp("star");
+                        setOpenMenu(null);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all text-yellow-500 hover:bg-yellow-50",
+                        activeTool === "stamp" && activeStamp === "star" && "bg-yellow-100 ring-1 ring-yellow-400"
+                      )}
+                    >
+                      <Star className="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
+                )}
               </div>
+            )}
+
+            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+
+            {/* Stroke Style & Color Popover */}
+            <div className="relative">
+              <button
+                title="Color & Stroke Width"
+                aria-label="Color and Stroke Width"
+                onClick={() => setOpenMenu(openMenu === "style" ? null : "style")}
+                className="p-1 rounded-lg transition-colors flex items-center gap-1 hover:bg-slate-100 border border-slate-200"
+              >
+                <div
+                  className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs"
+                  style={{ backgroundColor: activeColor }}
+                />
+                <span className="text-[10px] font-bold text-slate-600">{activeStrokeWidth}px</span>
+                <span className="text-[9px] text-slate-400">▼</span>
+              </button>
+
+              {openMenu === "style" && (
+                <div className="absolute top-full left-0 mt-1 p-2.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-52 space-y-2.5">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1.5">Color Palette</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {COLOR_PALETTE.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => { setActiveColor(c); }}
+                          className={cn(
+                            "w-5 h-5 rounded-full transition-transform border border-slate-300",
+                            activeColor === c ? "scale-115 ring-2 ring-indigo-500 ring-offset-1" : "hover:scale-110"
+                          )}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-2">
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1.5">Stroke Thickness</div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {STROKE_WIDTHS.map((sw) => (
+                        <button
+                          key={sw}
+                          onClick={() => { setActiveStrokeWidth(sw); }}
+                          className={cn(
+                            "py-1 text-center text-xs font-semibold rounded-md border border-slate-200 hover:bg-slate-50 transition-colors",
+                            activeStrokeWidth === sw ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold" : "text-slate-600"
+                          )}
+                        >
+                          {sw}px
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Compact Right Action Tools (Undo, Redo, Zoom, Fullscreen, Export Menu) */}
+        <div className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-sm backdrop-blur-md text-slate-700 ml-auto">
+          {!readOnly && (
+            <>
+              <button
+                title="Undo (Ctrl+Z)"
+                aria-label="Undo"
+                disabled={historyIndex <= 0}
+                onClick={handleUndo}
+                className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                title="Redo (Ctrl+Y)"
+                aria-label="Redo"
+                disabled={historyIndex >= history.length - 1}
+                onClick={handleRedo}
+                className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+              </button>
+              <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
             </>
           )}
 
-          <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
+          {/* Zoom controls */}
+          <button
+            title="Zoom Out"
+            aria-label="Zoom Out"
+            onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <span className="text-[11px] font-semibold text-slate-600 min-w-[32px] text-center">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            title="Zoom In"
+            aria-label="Zoom In"
+            onClick={() => setZoom((z) => Math.min(3, z + 0.1))}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            title="Reset View (100%)"
+            aria-label="Reset View"
+            onClick={() => {
+              setZoom(1);
+              setPan({ x: 0, y: 0 });
+            }}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
 
-          {/* Color Palette Picker */}
-          <div className="flex items-center gap-1 px-1">
-            {COLOR_PALETTE.map((c) => (
-              <button
-                key={c}
-                onClick={() => setActiveColor(c)}
-                className={cn(
-                  "w-4 h-4 rounded-full transition-transform border border-slate-300",
-                  activeColor === c ? "scale-125 ring-2 ring-indigo-500 ring-offset-1" : "hover:scale-110"
+          <button
+            title={isFullscreen ? "Exit fullscreen" : "Open whiteboard fullscreen"}
+            aria-label={isFullscreen ? "Exit whiteboard fullscreen" : "Open whiteboard fullscreen"}
+            onClick={() => void toggleFullscreen()}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+          </button>
+
+          <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+
+          {/* Export & Clear Actions Menu */}
+          <div className="relative">
+            <button
+              title="Export & Board Options"
+              aria-label="Export and Options"
+              onClick={() => setOpenMenu(openMenu === "actions" ? null : "actions")}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors",
+                openMenu === "actions" ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100 text-slate-700"
+              )}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export</span>
+              <span className="text-[9px] text-slate-400">▼</span>
+            </button>
+
+            {openMenu === "actions" && (
+              <div className="absolute top-full right-0 mt-1 p-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-44 space-y-0.5">
+                <button
+                  onClick={handleExportPNG}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                >
+                  <Download className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Download PNG Image</span>
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Export Printable PDF</span>
+                </button>
+                {!readOnly && (
+                  <>
+                    <div className="border-t border-slate-100 my-1" />
+                    <button
+                      onClick={() => { setOpenMenu(null); handleClear(); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-left"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear Canvas</span>
+                    </button>
+                  </>
                 )}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-
-          <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
-
-          {/* Stroke Width Selector */}
-          <div className="flex items-center gap-1">
-            {STROKE_WIDTHS.map((sw) => (
-              <button
-                key={sw}
-                onClick={() => setActiveStrokeWidth(sw)}
-                className={cn(
-                  "px-1.5 py-1 text-[11px] font-medium rounded hover:bg-slate-100 transition-colors",
-                  activeStrokeWidth === sw && "bg-slate-200 text-slate-900 font-bold"
-                )}
-              >
-                {sw}px
-              </button>
-            ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Top Right Action Tools (Undo/Redo, Zoom, PDF/PNG Export) */}
-      <div className="absolute top-4 right-4 z-40 flex items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-sm text-slate-700">
-        {!readOnly && (
-          <>
-            <button
-              title="Undo (Ctrl+Z)"
-              disabled={historyIndex <= 0}
-              onClick={handleUndo}
-              className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-            <button
-              title="Redo (Ctrl+Y)"
-              disabled={historyIndex >= history.length - 1}
-              onClick={handleRedo}
-              className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
-            <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
-          </>
-        )}
-
-        {/* Zoom Controls */}
-        <button
-          title="Zoom Out"
-          onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}
-          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <span className="text-xs font-semibold text-slate-600 min-w-[36px] text-center">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          title="Zoom In"
-          onClick={() => setZoom((z) => Math.min(3, z + 0.1))}
-          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        <button
-          title="Reset View"
-          onClick={() => {
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-          }}
-          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
-
-        <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
-
-        {/* Export options */}
-        <button
-          title="Export as PNG"
-          onClick={handleExportPNG}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors"
-        >
-          <Download className="w-4 h-4" />
-        </button>
-        <button
-          title="Export as PDF"
-          onClick={handleExportPDF}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors"
-        >
-          <FileDown className="w-3.5 h-3.5" />
-          PDF
-        </button>
-
-        {!readOnly && (
-          <button
-            title="Clear Board"
-            onClick={handleClear}
-            className="p-2 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Main Drawing Canvas with Dot Grid */}
@@ -1177,6 +1465,86 @@ export function WhiteboardCanvas({
           activeTool === "eraser" && "cursor-pointer"
         )}
       />
+
+      {/* --- Normal Standard Horizontal Scroller --- */}
+      <div className="absolute inset-x-0 bottom-0 z-20 flex h-3.5 items-center border-t border-slate-200/90 bg-slate-100/95 backdrop-blur-xs select-none pr-3.5">
+        <button
+          onClick={() => scrollByDelta(-250, 0)}
+          className="flex h-full w-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          title="Scroll Left"
+          aria-label="Scroll canvas left"
+        >
+          <ChevronLeft className="w-2.5 h-2.5" />
+        </button>
+
+        <div
+          ref={hTrackRef}
+          onPointerDown={handleHTrackPointerDown}
+          onPointerMove={handleHTrackPointerMove}
+          onPointerUp={handleHTrackPointerUp}
+          className="relative h-full flex-1 cursor-pointer bg-slate-200/50 hover:bg-slate-200/80 transition-colors"
+        >
+          <div
+            className={cn(
+              "absolute top-0.5 h-2.5 rounded-full bg-slate-400 hover:bg-slate-500 active:bg-indigo-600 transition-colors shadow-2xs",
+              isDraggingHScroll && "bg-indigo-600"
+            )}
+            style={{
+              width: "18%",
+              left: `${hRatio * 82}%`,
+            }}
+          />
+        </div>
+
+        <button
+          onClick={() => scrollByDelta(250, 0)}
+          className="flex h-full w-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          title="Scroll Right"
+          aria-label="Scroll canvas right"
+        >
+          <ChevronRight className="w-2.5 h-2.5" />
+        </button>
+      </div>
+
+      {/* --- Normal Standard Vertical Scroller --- */}
+      <div className="absolute right-0 top-0 bottom-3.5 z-20 flex w-3.5 flex-col items-center border-l border-slate-200/90 bg-slate-100/95 backdrop-blur-xs select-none">
+        <button
+          onClick={() => scrollByDelta(0, -250)}
+          className="flex w-full h-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          title="Scroll Up"
+          aria-label="Scroll canvas up"
+        >
+          <ChevronUp className="w-2.5 h-2.5" />
+        </button>
+
+        <div
+          ref={vTrackRef}
+          onPointerDown={handleVTrackPointerDown}
+          onPointerMove={handleVTrackPointerMove}
+          onPointerUp={handleVTrackPointerUp}
+          className="relative w-full flex-1 cursor-pointer bg-slate-200/50 hover:bg-slate-200/80 transition-colors"
+        >
+          <div
+            className={cn(
+              "absolute left-0.5 w-2.5 rounded-full bg-slate-400 hover:bg-slate-500 active:bg-indigo-600 transition-colors shadow-2xs",
+              isDraggingVScroll && "bg-indigo-600"
+            )}
+            style={{
+              height: "18%",
+              top: `${vRatio * 82}%`,
+            }}
+          />
+        </div>
+
+        <button
+          onClick={() => scrollByDelta(0, 250)}
+          className="flex w-full h-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          title="Scroll Down"
+          aria-label="Scroll canvas down"
+        >
+          <ChevronDown className="w-2.5 h-2.5" />
+        </button>
+      </div>
 
       {/* Inline Text Editor Popup */}
       {textInput.visible && (
@@ -1220,19 +1588,17 @@ export function WhiteboardCanvas({
         </div>
       )}
 
-
-
-      {/* Bottom Status & Info Bar */}
-      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-3 px-3 py-1.5 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-lg text-xs text-slate-500 shadow-xs">
+      {/* Bottom Status & Info Bar (Clean floating badge above the bottom scrollbar) */}
+      <div className="absolute bottom-5 left-2.5 z-10 flex items-center gap-2 px-2.5 py-1 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-lg text-[11px] text-slate-500 shadow-2xs">
         <div className="flex items-center gap-1.5 font-medium text-slate-700">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{initialWhiteboard?.title || "Collaborative Canvas"}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="max-w-[140px] sm:max-w-[200px] truncate">{initialWhiteboard?.title || "Collaborative Canvas"}</span>
         </div>
         <span className="text-slate-300">|</span>
-        <span>{elements.length} elements</span>
-        <span className="text-slate-300">|</span>
+        <span className="hidden sm:inline">{elements.length} items</span>
+        <span className="hidden sm:inline text-slate-300">|</span>
         <span className="flex items-center gap-1 text-indigo-600 font-medium">
-          <Sparkles className="w-3 h-3" /> {connectionError ? "Not saved ? check connection" : saving ? "Saving?" : "Synced"}
+          <Sparkles className="w-2.5 h-2.5" /> {connectionError ? "Not saved" : saving ? "Saving…" : "Synced"}
         </span>
       </div>
     </div>

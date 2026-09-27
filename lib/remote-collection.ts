@@ -12,6 +12,7 @@ export function useRemoteCollection<T extends { id: string }>(table: string) {
   const pending = useRef(0);
   const generation = useRef(0);
   const failed = useRef(false);
+  const saveError = useRef("");
   const refreshing = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -64,8 +65,13 @@ export function useRemoteCollection<T extends { id: string }>(table: string) {
       setError("");
     }).catch(e => {
       failed.current = true;
-      setError(`Changes were not saved: ${e instanceof Error ? e.message : "Connection failed"}. Reload to restore server data, then retry.`);
+      saveError.current = `Changes were not saved: ${e instanceof Error ? e.message : "Connection failed"}. Reload to restore server data, then retry.`;
+      setError(saveError.current);
     }).finally(() => { pending.current--; setSaving(pending.current > 0); });
   }, [table]);
-  return [rows, update, { error, loading, saving, refresh }] as const;
+  const waitForSave = useCallback(async () => {
+    await queue.current;
+    if (failed.current) throw new Error(saveError.current);
+  }, []);
+  return [rows, update, { error, loading, saving, refresh, waitForSave }] as const;
 }

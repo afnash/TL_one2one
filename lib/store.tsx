@@ -2,6 +2,7 @@
 
 import { useRemoteCollection } from "./remote-collection";
 import { supabaseRequest } from "./supabase";
+import { studentTimetable } from "./session-report";
 import React, {
   createContext,
   useContext,
@@ -22,6 +23,7 @@ import {
   Submission,
   StudyMaterial,
   SessionReport,
+  StudentTimetableEntry,
   Notification,
   WhiteboardElement,
 } from "@/types";
@@ -74,7 +76,8 @@ interface LMSContextType {
   ) => void;
   
   // Session Report Operations
-  createSessionReport: (report: Omit<SessionReport, "id" | "createdAt">) => SessionReport;
+  createSessionReport: (report: Omit<SessionReport, "id" | "createdAt">) => Promise<SessionReport>;
+  getStudentTimetable: (studentId: string) => StudentTimetableEntry[];
   
   // Materials
   addStudyMaterial: (material: Omit<StudyMaterial, "id" | "uploadDate" | "downloadsCount">) => void;
@@ -406,11 +409,13 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createSessionReport = (
+  const createSessionReport = async (
     reportData: Omit<SessionReport, "id" | "createdAt">
-  ): SessionReport => {
+  ): Promise<SessionReport> => {
+    if (sessionReportsSync.error) throw new Error(sessionReportsSync.error);
     const existingReport = sessionReports.find(r=>r.sessionId===reportData.sessionId);
     const newReport: SessionReport = {
+      ...existingReport,
       ...reportData,
       id: existingReport?.id || crypto.randomUUID(),
       createdAt: existingReport?.createdAt || new Date().toISOString(),
@@ -427,10 +432,17 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         : [newReport, ...prev];
     });
 
+    await sessionReportsSync.waitForSave();
+
     // Update the session reference if exists
     setSessions((prev) =>
       prev.map((s) => (s.id === reportData.sessionId ? { ...s, reportId: newReport.id } : s))
     );
+    await sessionsSync.waitForSave();
+
+    setStudents(previous => previous.map(student => student.id === reportData.studentId
+      ? { ...student, lastSessionDate: reportData.date } : student));
+    await studentsSync.waitForSave();
 
     return newReport;
   };
@@ -539,6 +551,11 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         submitAssignment,
         gradeSubmission,
         createSessionReport,
+        getStudentTimetable: (studentId) => {
+          const allowed = role === "SUPERADMIN" || (role === "STUDENT" ? studentId === user.id
+            : myStudents.some(s => s.id === studentId) || sessions.some(s => s.teacherId === user.id && (s.studentId === studentId || s.studentIds?.includes(studentId))));
+          return allowed ? studentTimetable(sessions, studentId) : [];
+        },
         addStudyMaterial,
         deleteStudyMaterial,
         addStudent,
