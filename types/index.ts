@@ -1,5 +1,46 @@
 export type UserRole = "TEACHER" | "STUDENT" | "SUPERADMIN";
 
+export interface Course {
+  id: string;
+  title: string;
+  track: string;
+  activitiesCount: number;
+  duration: string;
+  progress: number;
+  currentActivity?: string;
+  currentActivityModule?: string;
+  currentActivityDuration?: string;
+  status: "not_started" | "in_progress" | "completed";
+  description?: string;
+  skills?: string[];
+}
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  description: string;
+  type: "Project" | "Internship" | "Full-time" | "Part-time";
+  workplace: "Remote" | "On-site" | "Hybrid";
+  compensation: string;
+  eligible: boolean;
+  company?: string;
+  badge?: string;
+  location?: string;
+  deadline?: string;
+  requirements?: string[];
+}
+
+export interface OpportunityApplication {
+  id: string;
+  opportunityId: string;
+  opportunityTitle: string;
+  company: string;
+  appliedDate: string;
+  status: "UNDER_REVIEW" | "SHORTLISTED" | "ACCEPTED" | "REJECTED";
+  type: string;
+  workplace: string;
+}
+
 export interface User {
   id: string;
   name: string;
