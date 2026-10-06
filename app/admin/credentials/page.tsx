@@ -50,8 +50,8 @@ export default function AdminCredentialsPage() {
     {
       id: "admin-1",
       name: "Super Administrator",
-      email: "admin@onetoone.com",
-      password: "admin",
+      email: "admin@test.com",
+      password: "admin123",
       role: "SUPERADMIN" as UserRole,
       status: "active",
       avatar: "/icon.jpg",

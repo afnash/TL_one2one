@@ -113,7 +113,7 @@ const EMPTY_USERS: Record<UserRole, User> = {
   TEACHER: { id: "", name: "Teacher", email: "", avatar: "/icon.jpg", role: "TEACHER" },
   STUDENT: { id: "", name: "Student", email: "", avatar: "/icon.jpg", role: "STUDENT" },
   MANAGER: { id: "", name: "Manager", email: "", avatar: "/icon.jpg", role: "MANAGER" },
-  SUPERADMIN: { id: "", name: "Administrator", email: "", avatar: "/icon.jpg", role: "SUPERADMIN" },
+  SUPERADMIN: { id: "admin-1", name: "Administrator", email: "admin@test.com", avatar: "/icon.jpg", role: "SUPERADMIN" },
 };
 
 export function LMSProvider({ children }: { children: ReactNode }) {
@@ -163,7 +163,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     if (!cleanPass) throw new Error("Please enter your password.");
 
     // 1. Super Admin Check
-    const adminEmails = ["admin@onetoone.com", "superadmin@onetoone.com", "admin", "admin@sofia.edu"];
+    const adminEmails = ["admin@test.com", "admin@onetoone.com", "superadmin@onetoone.com", "admin", "admin@sofia.edu"];
     if (adminEmails.includes(cleanEmail) && (cleanPass === "admin123" || cleanPass === "admin" || cleanPass === "password123")) {
       setRole("SUPERADMIN");
       setIdentityId("admin-1");

@@ -187,7 +187,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => handleQuickFill("admin@onetoone.com", "admin")}
+                onClick={() => handleQuickFill("admin@test.com", "admin123")}
                 className="p-2.5 rounded-xl border border-amber-200/90 bg-amber-50/60 hover:bg-amber-100/80 text-left transition-colors"
               >
                 <div className="flex items-center gap-1.5 font-bold text-amber-800">
@@ -195,7 +195,7 @@ export default function LoginPage() {
                   <span>Super Admin</span>
                 </div>
                 <div className="text-[10px] text-amber-700/80 mt-0.5 truncate font-mono">
-                  admin@onetoone.com
+                  admin@test.com
                 </div>
               </button>
 
