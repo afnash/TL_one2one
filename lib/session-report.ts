@@ -80,8 +80,13 @@ export function buildSessionReport({ session, existing, student, tutor, reports,
 }
 
 export function validateSessionReport(report: ReportInput, publish: boolean): string | null {
-  if (!report.date || !/^\d{4}-\d{2}-\d{2}$/.test(report.date)) return "Enter the session date.";
-  if (publish && (!normalizeReportTime(report.startTime) || !normalizeReportTime(report.endTime))) return "Enter both session times before submitting.";
+  if (!report.date || !/^\d{4}-\d{2}-\d{2}$/.test(report.date)) return "Session date is required (YYYY-MM-DD).";
+  if (publish && (!normalizeReportTime(report.startTime) || !normalizeReportTime(report.endTime))) return "Both start and end session times are required.";
+  if (publish && !report.topicTaught?.trim()) return "Topic taught is required.";
+  if (publish && (!report.studentPerformanceRating || report.studentPerformanceRating < 1)) return "Student performance rating (1 to 5 stars) is required.";
+  if (publish && !report.studentPerformanceNotes?.trim()) return "Student performance and understanding notes are required.";
+  if (publish && !report.workCompleted?.trim() && !report.classOverview?.trim()) return "Summary of work completed during class is required.";
+  if (publish && !report.nextSessionPlan?.trim()) return "Plan for the next class is required.";
   if (publish && report.completionStatus === "PARTIAL" && !report.partialReason?.trim()) return "Add a reason for the partially completed class.";
   if (publish && report.technicalIssuesOccurred && (!report.technicalIssueDescription?.trim() || !report.technicalIssueImpact?.trim())) return "Describe the technical issues and their impact on the class.";
   const marks = report.testMarks, maximum = report.testMaxMarks;

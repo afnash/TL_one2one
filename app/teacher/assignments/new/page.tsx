@@ -31,7 +31,14 @@ function getTomorrowDateStr(): string {
 
 export default function NewAssignmentPage() {
   const router = useRouter();
-  const { user, students, subjects, createAssignment, createWhiteboard, saveWhiteboard } = useLMS();
+  const { user, students, directory, createAssignment, createWhiteboard, saveWhiteboard } = useLMS();
+
+  const currentTeacher = directory.teachers?.find((t) => t.id === user.id);
+  const teacherSubjects = currentTeacher?.subjects?.length
+    ? currentTeacher.subjects
+    : (user as any).subjects?.length
+    ? (user as any).subjects
+    : ["Mathematics"];
 
   const [kind, setKind] = useState<"ASSIGNMENT" | "HOMEWORK">("ASSIGNMENT");
   const [boardElements, setBoardElements] = useState<WhiteboardElement[] | null>(null);
@@ -40,7 +47,7 @@ export default function NewAssignmentPage() {
 
   // Form Fields with solid smart defaults
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState(subjects[0]?.name || "Mathematics");
+  const [subject, setSubject] = useState(teacherSubjects[0] || "Mathematics");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState(getTomorrowDateStr());
   const [dueTime, setDueTime] = useState("23:59");
@@ -53,10 +60,10 @@ export default function NewAssignmentPage() {
 
   // Sync subjects when loaded
   useEffect(() => {
-    if (!subject && subjects.length > 0) {
-      setSubject(subjects[0].name);
+    if (!subject && teacherSubjects.length > 0) {
+      setSubject(teacherSubjects[0]);
     }
-  }, [subjects, subject]);
+  }, [teacherSubjects, subject]);
 
   // Sync default student selection when students list loads
   useEffect(() => {
@@ -72,7 +79,7 @@ export default function NewAssignmentPage() {
       number: 1,
       text: "",
       maxScore: 5,
-      subject: subjects[0]?.name || "Mathematics",
+      subject: teacherSubjects[0] || "Mathematics",
     },
   ]);
 
@@ -163,7 +170,7 @@ export default function NewAssignmentPage() {
       return;
     }
 
-    const currentSubject = subject || (subjects[0]?.name ?? "Mathematics");
+    const currentSubject = subject || (teacherSubjects[0] ?? "Mathematics");
     if (!currentSubject) {
       setPublishError("Please choose or specify a subject.");
       setActiveTab("details");
@@ -348,20 +355,11 @@ export default function NewAssignmentPage() {
                   onChange={(e) => setSubject(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                 >
-                  {subjects.length > 0 ? (
-                    subjects.map((sub) => (
-                      <option key={sub.id} value={sub.name}>
-                        {sub.name}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Mathematics">Mathematics</option>
-                      <option value="Physics">Physics</option>
-                      <option value="Chemistry">Chemistry</option>
-                      <option value="Biology">Biology</option>
-                    </>
-                  )}
+                  {teacherSubjects.map((sub: string) => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

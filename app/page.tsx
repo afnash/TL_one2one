@@ -33,7 +33,6 @@ import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const router = useRouter();
-  const [loginMenuOpen, setLoginMenuOpen] = useState(false);
   const [activeScreenTab, setActiveScreenTab] = useState<"STUDENT" | "TEACHER">("STUDENT");
 
   // Mini Sandbox State
@@ -42,18 +41,6 @@ export default function HomePage() {
   const [penColor, setPenColor] = useState("#0f2a4a");
   const [brushSize, setBrushSize] = useState(3);
   const [isEraser, setIsEraser] = useState(false);
-
-  // Close login dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest("#login-dropdown-container")) {
-        setLoginMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // Initialize Canvas Demo
   useEffect(() => {
@@ -194,121 +181,14 @@ export default function HomePage() {
           </nav>
 
           {/* Top Right Actions */}
-          <div className="flex items-center gap-3" id="login-dropdown-container">
-            {/* Quick Demo Launch Buttons */}
-            <div className="hidden sm:flex items-center gap-2 pr-2 border-r border-slate-200">
-              <Link
-                href="/student/dashboard"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:text-[#0a2640] hover:bg-[#43c4d1]/20 transition-all"
-              >
-                <GraduationCap className="w-3.5 h-3.5 text-[#00838f]" />
-                <span>Student</span>
-              </Link>
-              <Link
-                href="/teacher/dashboard"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-all"
-              >
-                <Users className="w-3.5 h-3.5 text-blue-600" />
-                <span>Teacher</span>
-              </Link>
-            </div>
-
-            {/* Dropdown Menu Trigger */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setLoginMenuOpen(!loginMenuOpen)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0f2a4a] hover:bg-[#163a63] text-white text-xs font-bold shadow-xs transition-all"
-                aria-expanded={loginMenuOpen}
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Access Workspaces</span>
-                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", loginMenuOpen && "rotate-180")} />
-              </button>
-
-              {/* Dropdown Menu */}
-              {loginMenuOpen && (
-                <div className="absolute right-0 mt-2.5 w-80 bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-1.5">
-                  <div className="px-3 py-2 border-b border-slate-100">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      Select Workspace
-                    </p>
-                    <p className="text-xs font-semibold text-slate-800 mt-0.5">
-                      Direct single-click portal launch
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/student/dashboard"
-                    onClick={() => setLoginMenuOpen(false)}
-                    className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-[#e0f7fa]/60 transition-all group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-[#e0f7fa] text-[#00838f] flex items-center justify-center shrink-0">
-                      <GraduationCap className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-900 group-hover:text-[#00838f]">
-                          Sofia Student Portal
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 bg-[#43c4d1]/20 text-[#0a2640] rounded">
-                          Learner
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
-                        Courses, opportunities, live classroom & canvas
-                      </p>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/teacher/dashboard"
-                    onClick={() => setLoginMenuOpen(false)}
-                    className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-blue-50 transition-all group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600">
-                          Teacher Studio
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded">
-                          Educator
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
-                        Deliver 1:1 lessons, create tasks & visual grading
-                      </p>
-                    </div>
-                  </Link>
-
-                  <div className="pt-2 border-t border-slate-100 space-y-1">
-                    <Link
-                      href="/login"
-                      onClick={() => setLoginMenuOpen(false)}
-                      className="flex items-center justify-between p-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <UserCheck className="w-3.5 h-3.5 text-slate-500" />
-                        Choose Specific Profile
-                      </span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                    </Link>
-
-                    <Link
-                      href="/manage"
-                      onClick={() => setLoginMenuOpen(false)}
-                      className="flex items-center justify-between p-2 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                    >
-                      <span>Administrator Management Console</span>
-                      <ExternalLink className="w-3 h-3 text-slate-400" />
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0f2a4a] hover:bg-[#163a63] text-white text-xs font-bold shadow-xs transition-all group"
+            >
+              <LogIn className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              <span>Sign In</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -592,10 +472,10 @@ export default function HomePage() {
                       <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                     <Link
-                      href="/student/courses"
+                      href="/student/whiteboards"
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00838f] hover:underline"
                     >
-                      <span>Explore Courses</span>
+                      <span>Interactive Whiteboards</span>
                     </Link>
                   </div>
                 </div>
@@ -682,7 +562,7 @@ export default function HomePage() {
 
                   <p className="text-xs text-slate-500">
                     {activeScreenTab === "STUDENT"
-                      ? "Seamless navigation across Overview, Courses, Opportunities, and Applications."
+                      ? "Seamless navigation across Overview, Courses, and Opportunities."
                       : "Complete control over live tutoring rooms, question assignments, and automated parent reports."}
                   </p>
 

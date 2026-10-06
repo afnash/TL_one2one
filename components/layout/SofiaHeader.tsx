@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import {
+  ArrowLeft,
   ChevronDown,
   Video,
   BookOpen,
@@ -23,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface SofiaHeaderProps {
-  activeTab?: "overview" | "courses" | "opportunities" | "applications";
+  activeTab?: "overview" | "courses" | "opportunities";
 }
 
 export function SofiaHeader({ activeTab }: SofiaHeaderProps) {
@@ -40,8 +41,6 @@ export function SofiaHeader({ activeTab }: SofiaHeaderProps) {
       ? "courses"
       : pathname.includes("/opportunities")
       ? "opportunities"
-      : pathname.includes("/applications")
-      ? "applications"
       : "overview"
   );
 
@@ -69,7 +68,6 @@ export function SofiaHeader({ activeTab }: SofiaHeaderProps) {
     { label: "Overview", href: "/student/dashboard", key: "overview" },
     { label: "Courses", href: "/student/courses", key: "courses" },
     { label: "Opportunities", href: "/student/opportunities", key: "opportunities" },
-    { label: "Applications", href: "/student/applications", key: "applications" },
   ];
 
   const handleSignOut = async () => {
@@ -85,8 +83,21 @@ export function SofiaHeader({ activeTab }: SofiaHeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
-        {/* Left Side: Brand Logo + Primary Nav */}
-        <div className="flex items-center gap-8 lg:gap-12">
+        {/* Left Side: Back Button + Brand Logo + Primary Nav */}
+        <div className="flex items-center gap-4 sm:gap-6 lg:gap-10">
+          {/* Back Button with hover tooltip */}
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-600 hover:text-slate-900 transition-all shadow-2xs group relative flex items-center justify-center cursor-pointer shrink-0"
+            title="Back to previous page"
+            aria-label="Back to previous page"
+          >
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5 text-slate-700" />
+            <div className="absolute left-1/2 -bottom-8 -translate-x-1/2 px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg z-50">
+              Go back
+            </div>
+          </button>
+
           {/* Sofia Logo with distinct turquoise dot */}
           <Link
             href="/student/dashboard"

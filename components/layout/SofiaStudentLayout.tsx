@@ -9,7 +9,7 @@ import { useEffect } from "react";
 
 interface SofiaStudentLayoutProps {
   children: ReactNode;
-  activeTab?: "overview" | "courses" | "opportunities" | "applications";
+  activeTab?: "overview" | "courses" | "opportunities";
 }
 
 export function SofiaStudentLayout({ children, activeTab }: SofiaStudentLayoutProps) {

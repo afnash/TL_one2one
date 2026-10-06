@@ -27,7 +27,14 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function TeacherMaterialsPage() {
-  const { materials, subjects, addStudyMaterial, deleteStudyMaterial } = useLMS();
+  const { user, materials, directory, subjects, addStudyMaterial, deleteStudyMaterial } = useLMS();
+
+  const currentTeacher = directory.teachers?.find((t) => t.id === user.id);
+  const teacherSubjects = currentTeacher?.subjects?.length
+    ? currentTeacher.subjects
+    : (user as any).subjects?.length
+    ? (user as any).subjects
+    : ["Mathematics"];
 
   const [selectedSubject, setSelectedSubject] = useState<string>("ALL");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -54,7 +61,7 @@ export default function TeacherMaterialsPage() {
 
   // New material form
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState(subjects[0]?.name || "Mathematics");
+  const [subject, setSubject] = useState(teacherSubjects[0] || "Mathematics");
   const [type, setType] = useState<StudyMaterial["type"]>("PDF");
   const [resourceUrl, setResourceUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -484,19 +491,11 @@ export default function TeacherMaterialsPage() {
                       onChange={(e) => setSubject(e.target.value)}
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
                     >
-                      {subjects.length > 0 ? (
-                        subjects.map((sub) => (
-                          <option key={sub.id} value={sub.name}>
-                            {sub.name}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="Mathematics">Mathematics</option>
-                          <option value="Physics">Physics</option>
-                          <option value="Chemistry">Chemistry</option>
-                        </>
-                      )}
+                      {teacherSubjects.map((sub: string) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

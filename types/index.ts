@@ -1,4 +1,4 @@
-export type UserRole = "TEACHER" | "STUDENT" | "SUPERADMIN";
+export type UserRole = "TEACHER" | "STUDENT" | "SUPERADMIN" | "MANAGER";
 
 export interface Course {
   id: string;
@@ -48,9 +48,24 @@ export interface User {
   avatar: string;
   role: UserRole;
   phone?: string;
+  password?: string;
   timezone?: string;
   title?: string;
   bio?: string;
+}
+
+export interface Manager {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  phone?: string;
+  location?: string;
+  avatar?: string;
+  status?: "active" | "inactive";
+  joinedDate?: string;
+  teacherIds?: string[];
+  studentIds?: string[];
 }
 
 export interface Teacher {
@@ -59,6 +74,7 @@ export interface Teacher {
   id: string;
   name: string;
   email: string;
+  password?: string;
   avatar: string;
   subjects: string[];
   rating: number;
@@ -66,6 +82,8 @@ export interface Teacher {
   totalSessions: number;
   status: "active" | "away" | "offline";
   joinedDate: string;
+  managerId?: string;
+  managerName?: string;
 }
 
 export interface Student {
@@ -75,11 +93,14 @@ export interface Student {
   id: string;
   name: string;
   email: string;
+  password?: string;
   avatar: string;
   grade: string;
   subjects: string[];
   teacherId: string;
   teacherName: string;
+  managerId?: string;
+  managerName?: string;
   overallProgress: number;
   lastSessionDate?: string;
   nextSessionDate?: string;
@@ -124,6 +145,7 @@ export interface Session {
   topic: string;
   date: string;
   scheduledTime: string;
+  time?: string;
   durationMinutes: number;
   status: SessionStatus;
   actualStartTime?: string;

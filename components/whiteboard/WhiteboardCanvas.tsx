@@ -132,6 +132,43 @@ export function WhiteboardCanvas({
   const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+type ResizeHandle = "nw" | "ne" | "se" | "sw" | "n" | "s" | "e" | "w";
+
+function getResizeHandleAtCoords(
+  x: number,
+  y: number,
+  element: WhiteboardElement,
+  currentZoom: number
+): ResizeHandle | null {
+  const w = element.width || 320;
+  const h = element.height || 240;
+  const left = element.x;
+  const top = element.y;
+  const right = element.x + w;
+  const bottom = element.y + h;
+  const midX = element.x + w / 2;
+  const midY = element.y + h / 2;
+  const threshold = 14 / currentZoom;
+
+  const handles: { id: ResizeHandle; x: number; y: number }[] = [
+    { id: "nw", x: left, y: top },
+    { id: "ne", x: right, y: top },
+    { id: "se", x: right, y: bottom },
+    { id: "sw", x: left, y: bottom },
+    { id: "n", x: midX, y: top },
+    { id: "s", x: midX, y: bottom },
+    { id: "w", x: left, y: midY },
+    { id: "e", x: right, y: midY },
+  ];
+
+  for (const handle of handles) {
+    if (Math.hypot(x - handle.x, y - handle.y) <= threshold) {
+      return handle.id;
+    }
+  }
+  return null;
+}
+
   // Scrollbar dragging state
   const [isDraggingHScroll, setIsDraggingHScroll] = useState(false);
   const [isDraggingVScroll, setIsDraggingVScroll] = useState(false);
@@ -140,6 +177,7 @@ export function WhiteboardCanvas({
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [currentElement, setCurrentElement] = useState<WhiteboardElement | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [hoverHandle, setHoverHandle] = useState<ResizeHandle | null>(null);
   const [draggedElement, setDraggedElement] = useState<{
     id: string;
     offsetX: number;
@@ -147,6 +185,19 @@ export function WhiteboardCanvas({
     before: WhiteboardElement[];
     currentX: number;
     currentY: number;
+  } | null>(null);
+
+  const [resizingElement, setResizingElement] = useState<{
+    id: string;
+    handle: ResizeHandle;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    initialWidth: number;
+    initialHeight: number;
+    aspectRatio: number;
+    before: WhiteboardElement[];
   } | null>(null);
 
   // Text input overlay state
@@ -185,6 +236,52 @@ export function WhiteboardCanvas({
     },
     [historyIndex, notifySave]
   );
+
+  const handleScaleImage = useCallback((id: string, factor: number) => {
+    setElements((prev) => {
+      const target = prev.find((el) => el.id === id);
+      if (!target) return prev;
+      const curW = target.width || 320;
+      const curH = target.height || 240;
+      const newW = Math.max(50, Math.min(2400, Math.round(curW * factor)));
+      const newH = Math.max(40, Math.min(2400, Math.round(curH * factor)));
+      const deltaW = newW - curW;
+      const deltaH = newH - curH;
+      const nextX = Math.round(target.x - deltaW / 2);
+      const nextY = Math.round(target.y - deltaH / 2);
+
+      const updated = prev.map((el) =>
+        el.id === id ? { ...el, x: nextX, y: nextY, width: newW, height: newH } : el
+      );
+      pushToHistory(updated);
+      return updated;
+    });
+  }, [pushToHistory]);
+
+  const handleDeleteElement = useCallback((id: string) => {
+    setElements((prev) => {
+      const updated = prev.filter((el) => el.id !== id);
+      pushToHistory(updated);
+      if (selectedElementId === id) setSelectedElementId(null);
+      return updated;
+    });
+  }, [pushToHistory, selectedElementId]);
+
+  // Global Delete / Backspace key handler for selected element
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || (document.activeElement as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if (selectedElementId && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        handleDeleteElement(selectedElementId);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedElementId, handleDeleteElement]);
 
   const addImageFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -421,10 +518,72 @@ export function WhiteboardCanvas({
           if (image.complete && image.naturalWidth) {
             ctx.drawImage(image, el.x, el.y, imageWidth, imageHeight);
           }
-          ctx.strokeStyle = el.id === selectedElementId ? "#4f46e5" : "#cbd5e1";
-          ctx.lineWidth = (el.id === selectedElementId ? 2 : 1) / zoom;
-          ctx.setLineDash(el.id === selectedElementId ? [7 / zoom, 5 / zoom] : []);
-          ctx.strokeRect(el.x, el.y, imageWidth, imageHeight);
+          if (el.id === selectedElementId) {
+            // Selected active outline
+            ctx.strokeStyle = "#4f46e5";
+            ctx.lineWidth = 2 / zoom;
+            ctx.setLineDash([6 / zoom, 4 / zoom]);
+            ctx.strokeRect(el.x, el.y, imageWidth, imageHeight);
+            ctx.setLineDash([]);
+
+            // Draw 8 resize grab handles (corners + edge midpoints)
+            const left = el.x;
+            const top = el.y;
+            const right = el.x + imageWidth;
+            const bottom = el.y + imageHeight;
+            const midX = el.x + imageWidth / 2;
+            const midY = el.y + imageHeight / 2;
+            const handleRadius = 5.5 / zoom;
+
+            const handles = [
+              { x: left, y: top },
+              { x: right, y: top },
+              { x: right, y: bottom },
+              { x: left, y: bottom },
+              { x: midX, y: top },
+              { x: midX, y: bottom },
+              { x: left, y: midY },
+              { x: right, y: midY },
+            ];
+
+            handles.forEach((h) => {
+              ctx.fillStyle = "#ffffff";
+              ctx.strokeStyle = "#4f46e5";
+              ctx.lineWidth = 2 / zoom;
+              ctx.beginPath();
+              ctx.arc(h.x, h.y, handleRadius, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
+            });
+
+            // Dimensions badge
+            const dimText = `${Math.round(imageWidth)} × ${Math.round(imageHeight)}`;
+            ctx.font = `bold ${Math.max(9, Math.round(11 / zoom))}px 'Inter', sans-serif`;
+            const textMetrics = ctx.measureText(dimText);
+            const pillW = textMetrics.width + 12 / zoom;
+            const pillH = 18 / zoom;
+            const pillX = midX - pillW / 2;
+            const pillY = bottom + 6 / zoom;
+            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            ctx.beginPath();
+            if (ctx.roundRect) {
+              ctx.roundRect(pillX, pillY, pillW, pillH, 4 / zoom);
+            } else {
+              ctx.rect(pillX, pillY, pillW, pillH);
+            }
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(dimText, midX, pillY + pillH / 2);
+            ctx.textAlign = "start";
+            ctx.textBaseline = "alphabetic";
+          } else {
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 1 / zoom;
+            ctx.setLineDash([]);
+            ctx.strokeRect(el.x, el.y, imageWidth, imageHeight);
+          }
           break;
         }
 
@@ -617,6 +776,32 @@ export function WhiteboardCanvas({
       return;
     }
 
+    // 1. Check if clicking a resize handle of the currently selected element
+    if (selectedElementId) {
+      const selectedEl = elements.find((el) => el.id === selectedElementId);
+      if (selectedEl && selectedEl.type === "image") {
+        const handle = getResizeHandleAtCoords(x, y, selectedEl, zoom);
+        if (handle) {
+          const initialWidth = selectedEl.width || 320;
+          const initialHeight = selectedEl.height || 240;
+          setResizingElement({
+            id: selectedEl.id,
+            handle,
+            startX: x,
+            startY: y,
+            initialX: selectedEl.x,
+            initialY: selectedEl.y,
+            initialWidth,
+            initialHeight,
+            aspectRatio: initialWidth / initialHeight,
+            before: elements,
+          });
+          return;
+        }
+      }
+    }
+
+    // 2. Selection & Dragging
     if (activeTool === "select") {
       const image = [...elements].reverse().find(
         (element) =>
@@ -747,6 +932,73 @@ export function WhiteboardCanvas({
       return;
     }
 
+    // Interactive Resizing
+    if (resizingElement) {
+      const { x, y } = getCanvasCoords(e);
+      const dx = x - resizingElement.startX;
+      const dy = y - resizingElement.startY;
+      const { handle, initialX, initialY, initialWidth, initialHeight, aspectRatio } = resizingElement;
+
+      let newX = initialX;
+      let newY = initialY;
+      let newWidth = initialWidth;
+      let newHeight = initialHeight;
+      const minSize = 40;
+
+      if (handle === "se") {
+        newWidth = Math.max(minSize, initialWidth + dx);
+        newHeight = Math.max(minSize, initialHeight + dy);
+      } else if (handle === "sw") {
+        newWidth = Math.max(minSize, initialWidth - dx);
+        newX = initialX + (initialWidth - newWidth);
+        newHeight = Math.max(minSize, initialHeight + dy);
+      } else if (handle === "ne") {
+        newWidth = Math.max(minSize, initialWidth + dx);
+        newHeight = Math.max(minSize, initialHeight - dy);
+        newY = initialY + (initialHeight - newHeight);
+      } else if (handle === "nw") {
+        newWidth = Math.max(minSize, initialWidth - dx);
+        newX = initialX + (initialWidth - newWidth);
+        newHeight = Math.max(minSize, initialHeight - dy);
+        newY = initialY + (initialHeight - newHeight);
+      } else if (handle === "e") {
+        newWidth = Math.max(minSize, initialWidth + dx);
+      } else if (handle === "w") {
+        newWidth = Math.max(minSize, initialWidth - dx);
+        newX = initialX + (initialWidth - newWidth);
+      } else if (handle === "s") {
+        newHeight = Math.max(minSize, initialHeight + dy);
+      } else if (handle === "n") {
+        newHeight = Math.max(minSize, initialHeight - dy);
+        newY = initialY + (initialHeight - newHeight);
+      }
+
+      // Proportional aspect ratio if Shift is held
+      if (e.shiftKey && ["se", "sw", "ne", "nw"].includes(handle)) {
+        if (newWidth / aspectRatio > newHeight) {
+          newHeight = Math.max(minSize, Math.round(newWidth / aspectRatio));
+        } else {
+          newWidth = Math.max(minSize, Math.round(newHeight * aspectRatio));
+        }
+      }
+
+      setElements((previous) =>
+        previous.map((element) =>
+          element.id === resizingElement.id
+            ? {
+                ...element,
+                x: Math.round(newX),
+                y: Math.round(newY),
+                width: Math.round(newWidth),
+                height: Math.round(newHeight),
+              }
+            : element
+        )
+      );
+      return;
+    }
+
+    // Dragging / Moving
     if (draggedElement) {
       const { x, y } = getCanvasCoords(e);
       const nextX = x - draggedElement.offsetX;
@@ -764,8 +1016,21 @@ export function WhiteboardCanvas({
       return;
     }
 
-    if (!isDrawing || !currentElement) return;
+    // Update hover handle for cursor feedback
     const { x, y } = getCanvasCoords(e);
+    if (selectedElementId) {
+      const selectedEl = elements.find((el) => el.id === selectedElementId);
+      if (selectedEl && selectedEl.type === "image") {
+        const handle = getResizeHandleAtCoords(x, y, selectedEl, zoom);
+        setHoverHandle(handle);
+      } else {
+        setHoverHandle(null);
+      }
+    } else {
+      setHoverHandle(null);
+    }
+
+    if (!isDrawing || !currentElement) return;
 
     if (currentElement.type === "pen" || currentElement.type === "highlighter") {
       setCurrentElement((prev) => {
@@ -799,6 +1064,12 @@ export function WhiteboardCanvas({
   const handleMouseUp = () => {
     if (isPanning) {
       setIsPanning(false);
+      return;
+    }
+
+    if (resizingElement) {
+      pushToHistory(elements);
+      setResizingElement(null);
       return;
     }
 
@@ -1004,6 +1275,30 @@ export function WhiteboardCanvas({
     try {
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {}
+  };
+
+  const selectedElement = elements.find((el) => el.id === selectedElementId);
+
+  const getCanvasCursorStyle = () => {
+    if (isPanning) return "grabbing";
+    if (activeTool === "pan") return "grab";
+    if (resizingElement) {
+      if (["nw", "se"].includes(resizingElement.handle)) return "nwse-resize";
+      if (["ne", "sw"].includes(resizingElement.handle)) return "nesw-resize";
+      if (["n", "s"].includes(resizingElement.handle)) return "ns-resize";
+      if (["e", "w"].includes(resizingElement.handle)) return "ew-resize";
+    }
+    if (hoverHandle) {
+      if (["nw", "se"].includes(hoverHandle)) return "nwse-resize";
+      if (["ne", "sw"].includes(hoverHandle)) return "nesw-resize";
+      if (["n", "s"].includes(hoverHandle)) return "ns-resize";
+      if (["e", "w"].includes(hoverHandle)) return "ew-resize";
+    }
+    if (draggedElement) return "move";
+    if (activeTool === "select") return "default";
+    if (activeTool === "eraser") return "cell";
+    if (activeTool === "text") return "text";
+    return "crosshair";
   };
 
   return (
@@ -1451,6 +1746,49 @@ export function WhiteboardCanvas({
         </div>
       </div>
 
+      {/* Floating Image Resize & Actions Toolbar */}
+      {selectedElement && selectedElement.type === "image" && !readOnly && (
+        <div
+          className="pointer-events-auto absolute z-40 flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/95 px-2.5 py-1.5 shadow-lg backdrop-blur-md text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-150 select-none"
+          style={{
+            left: `${Math.max(120, Math.min((containerRef.current?.clientWidth || 800) - 130, (selectedElement.x + (selectedElement.width || 320) / 2) * zoom + pan.x))}px`,
+            top: `${Math.max(56, (selectedElement.y) * zoom + pan.y - 46)}px`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <span className="text-[11px] text-slate-500 font-mono pr-1.5 border-r border-slate-200">
+            {Math.round(selectedElement.width || 320)} × {Math.round(selectedElement.height || 240)}
+          </span>
+          <button
+            onClick={() => handleScaleImage(selectedElement.id, 0.8)}
+            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1 cursor-pointer"
+            title="Shrink image (-20%)"
+            aria-label="Shrink image"
+          >
+            <ZoomOut className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-[11px]">−20%</span>
+          </button>
+          <button
+            onClick={() => handleScaleImage(selectedElement.id, 1.25)}
+            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1 cursor-pointer"
+            title="Enlarge image (+25%)"
+            aria-label="Enlarge image"
+          >
+            <ZoomIn className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-[11px]">+25%</span>
+          </button>
+          <div className="w-[1px] h-3.5 bg-slate-200 mx-0.5" />
+          <button
+            onClick={() => handleDeleteElement(selectedElement.id)}
+            className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+            title="Delete image (Delete / Backspace)"
+            aria-label="Delete image"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Main Drawing Canvas with Dot Grid */}
       <canvas
         ref={canvasRef}
@@ -1458,12 +1796,8 @@ export function WhiteboardCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className={cn(
-          "w-full h-full min-h-0 flex-1 bg-grid-dots bg-[#fafbfd] touch-none cursor-crosshair",
-          activeTool === "pan" && "cursor-grab active:cursor-grabbing",
-          activeTool === "select" && (draggedElement ? "cursor-grabbing" : "cursor-grab"),
-          activeTool === "eraser" && "cursor-pointer"
-        )}
+        style={{ cursor: getCanvasCursorStyle() }}
+        className="w-full h-full min-h-0 flex-1 bg-grid-dots bg-[#fafbfd] touch-none"
       />
 
       {/* --- Normal Standard Horizontal Scroller --- */}

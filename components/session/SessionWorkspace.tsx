@@ -15,6 +15,6 @@ export function SessionWorkspace({ session, children }: { session: Session; chil
       {[["whiteboard", "Whiteboard"], ["coding", "Live coding"]].map(([value, label]) => <button key={value} aria-pressed={tab === value} onClick={() => setTab(value)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === value ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-200"}`}>{label}</button>)}
     </div>}
     <div className={`${cs && tab === "coding" ? "hidden" : "flex-1 min-h-0 relative"}`}>{children}</div>
-    {cs && <div className={tab === "coding" ? "flex-1 min-h-0" : "hidden"}><CodingWorkspace key={session.id} session={session} /></div>}
+    {cs && <div className={tab === "coding" ? "flex-1 min-h-0 flex flex-col h-full" : "hidden"}><CodingWorkspace key={session.id} session={session} /></div>}
   </div>;
 }

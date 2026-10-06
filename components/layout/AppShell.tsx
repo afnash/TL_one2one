@@ -29,6 +29,10 @@ export function AppShell({
   useEffect(() => {
     if (pathname.startsWith("/admin/")) {
       switchRole("SUPERADMIN");
+    } else if (pathname.startsWith("/manager/")) {
+      if (role !== "MANAGER" && role !== "SUPERADMIN") {
+        switchRole("MANAGER");
+      }
     } else if (!loading && (!user.id || !pathname.startsWith("/" + role.toLowerCase() + "/"))) {
       router.replace("/login");
     }
@@ -37,7 +41,7 @@ export function AppShell({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-[#f8f9ff] text-[#0b1c30] overflow-hidden font-sans md:pr-4 md:gap-6 lg:gap-8">
+    <div className="flex h-screen w-full bg-[#f8f9ff] text-[#0b1c30] overflow-hidden font-sans md:p-3.5 md:gap-5 lg:gap-6">
       {/* Desktop Compressable Sidebar */}
       {!hideSidebar && (
         <div className="hidden md:flex h-full shrink-0 transition-all duration-300">

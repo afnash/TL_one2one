@@ -8,6 +8,7 @@ import { SessionWorkspace } from "@/components/session/SessionWorkspace";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
 import { LiveVideoTile } from "@/components/session/LiveVideoTile";
+import { useWebRTC } from "@/lib/webrtc";
 import { formatTime } from "@/lib/utils";
 import {
   Mic,
@@ -121,8 +122,21 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
     });
   }, [currentSession, isCameraOn, isMicOn, updateSession, user.id]);
 
+  const {
+    localStream,
+    remoteStream,
+    isConnected: isWebRTCConnected,
+    remoteMediaState,
+  } = useWebRTC({
+    sessionId,
+    userId: user.id,
+    isInitiator: true,
+    isCameraOn,
+    isMicOn,
+  });
+
   const studentMedia = currentSession?.mediaState?.[studentObj?.id || ""];
-  const isStudentCameraOn = studentMedia?.cameraOn === true;
+  const isStudentCameraOn = studentMedia?.cameraOn === true || remoteMediaState.cameraOn;
 
   // End Session flow
   const handleEndSession = () => {
@@ -332,8 +346,20 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
               roleLabel="Student"
               isLocalUser={false}
               isCameraOn={isStudentCameraOn}
-              isMicOn={studentMedia?.micOn ?? false}
+              isMicOn={studentMedia?.micOn || remoteMediaState.micOn}
               fallbackAvatar={studentObj.avatar}
+              stream={remoteStream}
+            />
+
+            {/* Teacher (You) Live Webcam Tile */}
+            <LiveVideoTile
+              participantName={`${user.name} (You)`}
+              roleLabel="Teacher"
+              isLocalUser={true}
+              isCameraOn={isCameraOn}
+              isMicOn={isMicOn}
+              fallbackAvatar={currentSession.teacherAvatar}
+              stream={localStream}
             />
 
             {/* Floating Media Controls */}
@@ -391,18 +417,9 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
 
         {/* Right Workspace (Expands to 100% width when Video Panel is Minimized or Floating) */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-          {/* Top Secondary Bar (Slim 36px) */}
-          <div className="px-3 py-1 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur-md flex items-center justify-between shrink-0 gap-2">
-            <StudentBoardSelector
-              currentWhiteboardId={activeWhiteboardId}
-              onSelectBoard={(id) => setActiveWhiteboardId(id)}
-              selectedStudentId={selectedStudentId}
-              onSelectStudent={(id) => setSelectedStudentId(id)}
-              isTeacherMode={true}
-            />
-
-            {/* In-Class Assignment Marking Banner if in ASSIGNMENT_VIEW */}
-            {workspaceMode === "ASSIGNMENT_VIEW" && (
+          {/* In-Class Assignment Marking Banner if in ASSIGNMENT_VIEW */}
+          {workspaceMode === "ASSIGNMENT_VIEW" && (
+            <div className="px-3 py-1.5 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur-md flex items-center justify-end shrink-0 gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-slate-700 hidden sm:inline">
                   Score:
@@ -420,8 +437,8 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
                   Save
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Interactive Infinite Canvas */}
           <div className="flex-1 min-h-0 w-full relative">
@@ -488,14 +505,26 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
                 </div>
 
                 {/* Compact Stacked Video Feeds */}
-                <div className="grid grid-cols-1">
+                <div className="grid grid-cols-2 gap-1.5">
                   <LiveVideoTile
                     participantName={studentObj.name}
                     roleLabel="Student"
                     isLocalUser={false}
                     isCameraOn={isStudentCameraOn}
-                    isMicOn={studentMedia?.micOn ?? false}
+                    isMicOn={studentMedia?.micOn || remoteMediaState.micOn}
                     fallbackAvatar={studentObj.avatar}
+                    stream={remoteStream}
+                    compact={true}
+                    className="aspect-video rounded-xl"
+                  />
+                  <LiveVideoTile
+                    participantName="You"
+                    roleLabel="Teacher"
+                    isLocalUser={true}
+                    isCameraOn={isCameraOn}
+                    isMicOn={isMicOn}
+                    fallbackAvatar={currentSession.teacherAvatar}
+                    stream={localStream}
                     compact={true}
                     className="aspect-video rounded-xl"
                   />
@@ -589,16 +618,6 @@ export default function TeacherLiveSessionPage({ params }: PageProps) {
                 </div>
               </div>
             )}
-
-            <LiveVideoTile
-              participantName={user.name}
-              roleLabel="Teacher"
-              isLocalUser={true}
-              isCameraOn={isCameraOn}
-              isMicOn={isMicOn}
-              fallbackAvatar={currentSession.teacherAvatar}
-              className="hidden"
-            />
           </div>
         </div>
       </div>

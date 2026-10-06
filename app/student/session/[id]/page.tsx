@@ -8,6 +8,7 @@ import { SessionWorkspace } from "@/components/session/SessionWorkspace";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
 import { LiveVideoTile } from "@/components/session/LiveVideoTile";
+import { useWebRTC } from "@/lib/webrtc";
 import { formatTime } from "@/lib/utils";
 import {
   Mic,
@@ -20,6 +21,11 @@ import {
   Minimize2,
   Maximize2,
   Move,
+  CheckCircle2,
+  ArrowRight,
+  Home,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +50,8 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
   } = useLMS();
 
   const currentSession = sessions.find((s) => s.id === sessionId) || activeSession;
+  const isSessionEnded = currentSession ? currentSession.status === "COMPLETED" : false;
+  const [countdown, setCountdown] = useState(3);
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -55,6 +63,22 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
   const [activeWhiteboardId, setActiveWhiteboardId] = useState(
     currentSession?.whiteboardId || ""
   );
+
+  // Auto-redirect countdown when session is closed/ended by teacher
+  useEffect(() => {
+    if (!isSessionEnded) return;
+
+    if (countdown <= 0) {
+      router.push("/student/dashboard");
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [isSessionEnded, countdown, router]);
 
   useEffect(() => {
     if (currentSession && currentSession.status === "LIVE" && !activeSession) {
@@ -77,8 +101,21 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
     });
   }, [currentSession, isCameraOn, isMicOn, updateSession, user.id]);
 
+  const {
+    localStream,
+    remoteStream,
+    isConnected: isWebRTCConnected,
+    remoteMediaState,
+  } = useWebRTC({
+    sessionId,
+    userId: user.id,
+    isInitiator: false,
+    isCameraOn,
+    isMicOn,
+  });
+
   const teacherMedia = currentSession?.mediaState?.[currentSession?.teacherId || ""];
-  const isTeacherCameraOn = teacherMedia?.cameraOn === true;
+  const isTeacherCameraOn = teacherMedia?.cameraOn === true || remoteMediaState.cameraOn;
 
   const handleLeaveSession = () => {
     if (window.confirm("Are you sure you want to leave the live classroom?")) {
@@ -233,8 +270,20 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
               roleLabel="Teacher"
               isLocalUser={false}
               isCameraOn={isTeacherCameraOn}
-              isMicOn={teacherMedia?.micOn ?? false}
+              isMicOn={teacherMedia?.micOn || remoteMediaState.micOn}
               fallbackAvatar={currentSession.teacherAvatar}
+              stream={remoteStream}
+            />
+
+            {/* Student (You) Live Webcam Tile */}
+            <LiveVideoTile
+              participantName={`${user.name} (You)`}
+              roleLabel="Student"
+              isLocalUser={true}
+              isCameraOn={isCameraOn}
+              isMicOn={isMicOn}
+              fallbackAvatar={user.avatar || currentSession.studentAvatar}
+              stream={localStream}
             />
 
             {/* Controls */}
@@ -266,20 +315,6 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
 
         {/* Right: Collaborative Infinite Canvas */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-          <div className="px-3 py-1 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur-md flex items-center justify-between shrink-0 gap-2">
-            <StudentBoardSelector
-              currentWhiteboardId={activeWhiteboardId}
-              onSelectBoard={(id) => setActiveWhiteboardId(id)}
-              selectedStudentId={user.id}
-              isTeacherMode={false}
-            />
-
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
-              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              Shared Canvas
-            </span>
-          </div>
-
           <div className="flex-1 min-h-0 w-full relative">
             <SessionWorkspace session={currentSession}>
               <WhiteboardCanvas
@@ -346,14 +381,26 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
                 </div>
 
                 {/* Compact Stacked Video Feeds */}
-                <div className="grid grid-cols-1">
+                <div className="grid grid-cols-2 gap-1.5">
                   <LiveVideoTile
                     participantName={currentSession.teacherName}
                     roleLabel="Teacher"
                     isLocalUser={false}
                     isCameraOn={isTeacherCameraOn}
-                    isMicOn={teacherMedia?.micOn ?? false}
+                    isMicOn={teacherMedia?.micOn || remoteMediaState.micOn}
                     fallbackAvatar={currentSession.teacherAvatar}
+                    stream={remoteStream}
+                    compact={true}
+                    className="aspect-video rounded-xl"
+                  />
+                  <LiveVideoTile
+                    participantName="You"
+                    roleLabel="Student"
+                    isLocalUser={true}
+                    isCameraOn={isCameraOn}
+                    isMicOn={isMicOn}
+                    fallbackAvatar={user.avatar || currentSession.studentAvatar}
+                    stream={localStream}
                     compact={true}
                     className="aspect-video rounded-xl"
                   />
@@ -436,19 +483,63 @@ export default function StudentLiveSessionPage({ params }: PageProps) {
                 </div>
               </div>
             )}
-
-            <LiveVideoTile
-              participantName={user.name}
-              roleLabel="Student"
-              isLocalUser={true}
-              isCameraOn={isCameraOn}
-              isMicOn={isMicOn}
-              fallbackAvatar={currentSession.studentAvatar}
-              className="hidden"
-            />
           </div>
         </div>
       </div>
+
+      {/* Session Ended Notification Modal Overlay */}
+      {isSessionEnded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-indigo-500/30 bg-gradient-to-b from-slate-900 to-slate-950 p-6 text-center shadow-2xl shadow-indigo-950/60 ring-1 ring-white/10">
+            {/* Top decorative glow */}
+            <div className="absolute -top-16 left-1/2 -translate-x-1/2 h-32 w-48 rounded-full bg-indigo-500/20 blur-2xl" />
+
+            {/* Icon */}
+            <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="h-8 w-8 animate-bounce" />
+            </div>
+
+            {/* Title & Badge */}
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 mb-2">
+              <Sparkles className="h-3 w-3" />
+              <span>1:1 Classroom Concluded</span>
+            </div>
+
+            <h2 className="text-xl font-bold tracking-tight text-white mb-2">
+              Session Has Ended
+            </h2>
+
+            <p className="text-sm text-slate-300 leading-relaxed mb-6">
+              Your educator has closed this live session. Your learning progress and whiteboard notes have been saved.
+            </p>
+
+            {/* Countdown Badge */}
+            <div className="mb-6 rounded-2xl border border-white/10 bg-slate-800/60 p-4">
+              <p className="text-xs font-medium text-slate-400 mb-2">
+                Going to home screen in
+              </p>
+              <div className="flex items-center justify-center gap-2 font-mono text-2xl font-black text-indigo-400">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-white animate-pulse">
+                  {countdown}
+                </span>
+                <span className="text-sm font-sans font-medium text-slate-400">
+                  {countdown === 1 ? "second" : "seconds"}...
+                </span>
+              </div>
+            </div>
+
+            {/* Direct Action Button */}
+            <button
+              onClick={() => router.push("/student/dashboard")}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all active:scale-98 cursor-pointer"
+            >
+              <Home className="h-4 w-4" />
+              <span>Go to Home Dashboard</span>
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

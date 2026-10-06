@@ -81,7 +81,7 @@ export default function ManageLogin() {
             ← Back to Home
           </Link>
           <Link href="/login" className="hover:text-blue-600 font-medium">
-            Student / Teacher Access
+            User / Faculty / Manager Access
           </Link>
         </div>
       </form>

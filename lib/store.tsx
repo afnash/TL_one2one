@@ -16,6 +16,7 @@ import {
   User,
   Teacher,
   Student,
+  Manager,
   Subject,
   Session,
   Whiteboard,
@@ -30,8 +31,10 @@ import {
 
 interface LMSContextType {
   role: UserRole;
-  directory: { teachers: Teacher[]; students: Student[] };
-  login: (role: "STUDENT" | "TEACHER", id: string) => Promise<void>;
+  directory: { teachers: Teacher[]; students: Student[]; managers: Manager[] };
+  login: (role: "STUDENT" | "TEACHER" | "MANAGER", id: string) => Promise<void>;
+  loginWithCredentials: (email: string, password: string) => Promise<{ role: UserRole; redirect: string; user: any }>;
+  updateCredentials: (role: UserRole, id: string, email: string, password?: string) => void;
   createSession: (data: Omit<Session, "id">) => Session;
   updateSession: (id: string, changes: Partial<Session>) => void;
   deleteAssignment: (id: string) => void;
@@ -42,6 +45,7 @@ interface LMSContextType {
   switchRole: (newRole: UserRole) => void;
   teachers: Teacher[];
   students: Student[];
+  managers: Manager[];
   subjects: Subject[];
   sessions: Session[];
   whiteboards: Whiteboard[];
@@ -83,11 +87,16 @@ interface LMSContextType {
   addStudyMaterial: (material: Omit<StudyMaterial, "id" | "uploadDate" | "downloadsCount">) => void;
   deleteStudyMaterial: (id: string) => void;
   
-  // Student & Teacher Management
+  // Student, Teacher & Manager Management
   addStudent: (student: Omit<Student, "id" | "joinedDate">) => void;
   updateStudent: (id: string, updates: Partial<Student>) => void;
+  deleteStudent: (id: string) => void;
   addTeacher: (teacher: Omit<Teacher, "id" | "joinedDate" | "totalSessions">) => void;
   updateTeacher: (id: string, updates: Partial<Teacher>) => void;
+  deleteTeacher: (id: string) => void;
+  addManager: (manager: Omit<Manager, "id" | "joinedDate">) => void;
+  updateManager: (id: string, updates: Partial<Manager>) => void;
+  deleteManager: (id: string) => void;
   
   // Notifications & Global Search
   markNotificationRead: (id: string) => void;
@@ -103,6 +112,7 @@ const STORAGE_KEY = "onetoone_identity";
 const EMPTY_USERS: Record<UserRole, User> = {
   TEACHER: { id: "", name: "Teacher", email: "", avatar: "/icon.jpg", role: "TEACHER" },
   STUDENT: { id: "", name: "Student", email: "", avatar: "/icon.jpg", role: "STUDENT" },
+  MANAGER: { id: "", name: "Manager", email: "", avatar: "/icon.jpg", role: "MANAGER" },
   SUPERADMIN: { id: "", name: "Administrator", email: "", avatar: "/icon.jpg", role: "SUPERADMIN" },
 };
 
@@ -110,6 +120,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>("TEACHER");
   const [teachers, setTeachers, teachersSync] = useRemoteCollection<Teacher>("lms_teachers");
   const [students, setStudents, studentsSync] = useRemoteCollection<Student>("lms_students");
+  const [managers, setManagers, managersSync] = useRemoteCollection<Manager>("lms_managers");
   const [subjects, setSubjects, subjectsSync] = useRemoteCollection<Subject>("lms_subjects");
   const [sessions, setSessions, sessionsSync] = useRemoteCollection<Session>("lms_sessions");
   const [whiteboards, setWhiteboards, whiteboardsSync] = useRemoteCollection<Whiteboard>("lms_whiteboards");
@@ -131,39 +142,127 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     if (stored) { try { const identity = JSON.parse(stored); setRole(identity.role); setIdentityId(identity.id); } catch { localStorage.removeItem(STORAGE_KEY); } }
     setHasHydrated(true);
   }, []);
-  const login = async (selectedRole: "STUDENT" | "TEACHER", id: string) => {
-    const person = (selectedRole === "TEACHER" ? teachers : students).find(p => p.id === id);
+
+  const login = async (selectedRole: "STUDENT" | "TEACHER" | "MANAGER", id: string) => {
+    const person = selectedRole === "TEACHER" 
+      ? teachers.find(p => p.id === id) 
+      : selectedRole === "MANAGER"
+        ? managers.find(p => p.id === id)
+        : students.find(p => p.id === id);
     if (!person) throw new Error("Choose an existing profile or ask an administrator to create one.");
     await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ id, data: { id, role: selectedRole, name: person.name, lastLoginAt: new Date().toISOString() } }) });
     setRole(selectedRole); setIdentityId(id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: selectedRole, id }));
   };
-  const syncStates = [teachersSync, studentsSync, subjectsSync, sessionsSync, whiteboardsSync, assignmentsSync, submissionsSync, materialsSync, sessionReportsSync, notificationsSync];
+
+  const loginWithCredentials = async (emailInput: string, passwordInput: string) => {
+    const cleanEmail = (emailInput || "").trim().toLowerCase();
+    const cleanPass = (passwordInput || "").trim();
+
+    if (!cleanEmail) throw new Error("Please enter your email address.");
+    if (!cleanPass) throw new Error("Please enter your password.");
+
+    // 1. Super Admin Check
+    const adminEmails = ["admin@onetoone.com", "superadmin@onetoone.com", "admin", "admin@sofia.edu"];
+    if (adminEmails.includes(cleanEmail) && (cleanPass === "admin123" || cleanPass === "admin" || cleanPass === "password123")) {
+      setRole("SUPERADMIN");
+      setIdentityId("admin-1");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "SUPERADMIN", id: "admin-1" }));
+      return { role: "SUPERADMIN" as UserRole, redirect: "/admin/dashboard", user: EMPTY_USERS.SUPERADMIN };
+    }
+
+    // 2. Manager Check
+    const matchedManager = managers.find(m => 
+      m.email?.toLowerCase() === cleanEmail && 
+      ((m.password && m.password === cleanPass) || (!m.password && (cleanPass === "password123" || cleanPass === "123456" || cleanPass === "admin123")))
+    );
+    if (matchedManager) {
+      if (matchedManager.status === "inactive") throw new Error("This manager account is marked inactive. Contact Super Admin.");
+      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ id: matchedManager.id, data: { id: matchedManager.id, role: "MANAGER", name: matchedManager.name, lastLoginAt: new Date().toISOString() } })
+      });
+      setRole("MANAGER");
+      setIdentityId(matchedManager.id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "MANAGER", id: matchedManager.id }));
+      return { role: "MANAGER" as UserRole, redirect: "/manager/dashboard", user: matchedManager };
+    }
+
+    // 3. Teacher Check
+    const matchedTeacher = teachers.find(t => 
+      t.email?.toLowerCase() === cleanEmail && 
+      ((t.password && t.password === cleanPass) || (!t.password && (cleanPass === "password123" || cleanPass === "123456")))
+    );
+    if (matchedTeacher) {
+      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ id: matchedTeacher.id, data: { id: matchedTeacher.id, role: "TEACHER", name: matchedTeacher.name, lastLoginAt: new Date().toISOString() } })
+      });
+      setRole("TEACHER");
+      setIdentityId(matchedTeacher.id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "TEACHER", id: matchedTeacher.id }));
+      return { role: "TEACHER" as UserRole, redirect: "/teacher/dashboard", user: matchedTeacher };
+    }
+
+    // 4. Student Check
+    const matchedStudent = students.find(s => 
+      s.email?.toLowerCase() === cleanEmail && 
+      ((s.password && s.password === cleanPass) || (!s.password && (cleanPass === "password123" || cleanPass === "123456")))
+    );
+    if (matchedStudent) {
+      if (matchedStudent.status === "inactive") throw new Error("This student account is inactive. Contact your administrator.");
+      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ id: matchedStudent.id, data: { id: matchedStudent.id, role: "STUDENT", name: matchedStudent.name, lastLoginAt: new Date().toISOString() } })
+      });
+      setRole("STUDENT");
+      setIdentityId(matchedStudent.id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "STUDENT", id: matchedStudent.id }));
+      return { role: "STUDENT" as UserRole, redirect: "/student/dashboard", user: matchedStudent };
+    }
+
+    throw new Error("Invalid email or password. Please verify your credentials.");
+  };
+
+  const syncStates = [teachersSync, studentsSync, managersSync, subjectsSync, sessionsSync, whiteboardsSync, assignmentsSync, submissionsSync, materialsSync, sessionReportsSync, notificationsSync];
   const connectionError = syncStates.find(s => s.error)?.error || "";
   const loading = !hasHydrated || syncStates.some(s => s.loading);
   const saving = syncStates.some(s => s.saving);
 
-  // Live Timer Interval
+  // Live Timer Interval - increments active teaching seconds while in session
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (sessionStartTime) {
+    if (activeSession && sessionStartTime) {
       interval = setInterval(() => {
-        const now = Date.now();
-        const diffInSecs = Math.floor((now - sessionStartTime) / 1000);
-        setSessionElapsedSeconds(diffInSecs);
+        setSessionElapsedSeconds((prev) => {
+          const next = prev + 1;
+          if (activeSession?.id && next % 5 === 0) {
+            try {
+              localStorage.setItem(`onetoone_active_sec_${activeSession.id}`, String(next));
+            } catch {
+              // ignore
+            }
+          }
+          return next;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [sessionStartTime]);
+  }, [activeSession, sessionStartTime]);
 
   const user: User = role === "TEACHER"
     ? teachers.find(t => t.id === identityId) ? { ...teachers.find(t => t.id === identityId)!, role: "TEACHER" } : EMPTY_USERS.TEACHER
     : role === "STUDENT"
       ? students.find(t => t.id === identityId) ? { ...students.find(t => t.id === identityId)!, role: "STUDENT" } : EMPTY_USERS.STUDENT
-      : EMPTY_USERS.SUPERADMIN;
+      : role === "MANAGER"
+        ? managers.find(m => m.id === identityId) ? { ...managers.find(m => m.id === identityId)!, role: "MANAGER", avatar: managers.find(m => m.id === identityId)!.avatar || "/icon.jpg" } : EMPTY_USERS.MANAGER
+        : EMPTY_USERS.SUPERADMIN;
 
   const switchRole = (newRole: UserRole) => {
-    if (newRole === "SUPERADMIN") { setRole(newRole); return; }
+    if (newRole === "SUPERADMIN" || newRole === "MANAGER") { setRole(newRole); return; }
     window.location.href = "/login";
   };
 
@@ -171,28 +270,67 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     const sess = sessions.find((s) => s.id === sessionId);
     if (!sess || sess.status === "COMPLETED" || sess.status === "CANCELLED") return;
     if (role === "STUDENT" && sess.status !== "LIVE") return;
-    const nowMs = sess.startedAt ? Date.parse(sess.startedAt) : Date.now();
-    setSessionStartTime(nowMs);
-    setSessionElapsedSeconds(0);
-    
+
+    // Retrieve active teaching seconds; ignore stale/overflow values (> 5 hours)
+    let initialSecs = 0;
+    try {
+      const stored = localStorage.getItem(`onetoone_active_sec_${sessionId}`);
+      if (stored) {
+        const parsed = Number(stored);
+        if (!isNaN(parsed) && parsed > 0 && parsed < 18000) {
+          initialSecs = parsed;
+        }
+      } else if (sess.actualDurationSeconds && sess.actualDurationSeconds > 0 && sess.actualDurationSeconds < 18000) {
+        initialSecs = sess.actualDurationSeconds;
+      }
+    } catch {
+      // ignore
+    }
+
+    const now = new Date();
+    setSessionStartTime(Date.now() - initialSecs * 1000);
+    setSessionElapsedSeconds(initialSecs);
+
     if (sess) {
       const updated: Session = {
         ...sess,
         status: "LIVE",
-        startedAt: new Date(nowMs).toISOString(),
-        actualStartTime: new Date(nowMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        startedAt: sess.startedAt && initialSecs > 0 ? sess.startedAt : now.toISOString(),
+        actualStartTime: sess.actualStartTime || now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        actualDurationSeconds: initialSecs,
       };
       setActiveSession(updated);
-      if (role !== "STUDENT" && sess.status !== "LIVE") setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
+      if (role !== "STUDENT" && sess.status !== "LIVE") {
+        setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
+      }
     }
   };
 
   const endLiveSession = (sessionId: string) => {
-    const endMs = Date.now();
-    const startMs = sessionStartTime || endMs;
-    const durationSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+    const sess = sessions.find((s) => s.id === sessionId);
+
+    // Use active teaching seconds only
+    let durationSeconds = sessionElapsedSeconds;
+    if (!durationSeconds || durationSeconds <= 0) {
+      try {
+        const stored = localStorage.getItem(`onetoone_active_sec_${sessionId}`);
+        if (stored) durationSeconds = Number(stored) || 0;
+      } catch {
+        // ignore
+      }
+    }
+
+    // Safety fallback: if 0 or excessively huge from an old abandoned session (> 4 hours), cap to scheduled duration
+    if (!durationSeconds || durationSeconds <= 0) {
+      durationSeconds = sess?.durationMinutes ? sess.durationMinutes * 60 : 1800;
+    } else if (durationSeconds > 14400) {
+      durationSeconds = sess?.durationMinutes ? sess.durationMinutes * 60 : 3600;
+    }
+
     const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
 
+    const endMs = Date.now();
+    const startMs = endMs - durationSeconds * 1000;
     const startTimeStr = new Date(startMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const endTimeStr = new Date(endMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -210,6 +348,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
           : s
       )
     );
+
+    try {
+      localStorage.removeItem(`onetoone_active_sec_${sessionId}`);
+    } catch {
+      // ignore
+    }
 
     setActiveSession(null);
     setSessionStartTime(null);
@@ -479,6 +623,10 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const deleteStudent = (id: string) => {
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+  };
+
   const addTeacher = (teacherData: Omit<Teacher, "id" | "joinedDate" | "totalSessions">) => {
     const newTeacher: Teacher = {
       ...teacherData,
@@ -493,6 +641,29 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     setTeachers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
     );
+  };
+
+  const deleteTeacher = (id: string) => {
+    setTeachers((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const addManager = (managerData: Omit<Manager, "id" | "joinedDate">) => {
+    const newManager: Manager = {
+      ...managerData,
+      id: crypto.randomUUID(),
+      joinedDate: new Date().toISOString().split("T")[0],
+    };
+    setManagers((prev) => [...prev, newManager]);
+  };
+
+  const updateManager = (id: string, updates: Partial<Manager>) => {
+    setManagers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+    );
+  };
+
+  const deleteManager = (id: string) => {
+    setManagers((prev) => prev.filter((m) => m.id !== id));
   };
 
   const markNotificationRead = (id: string) => {
@@ -515,27 +686,78 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   };
   const updateSession = (id: string, changes: Partial<Session>) => setSessions(previous => previous.map(s => s.id === id ? { ...s, ...changes } : s));
   const deleteAssignment = (id: string) => setAssignments(previous => previous.filter(a => a.id !== id));
+  
+  // Role-based visibility scopes
   const myStudents = students.filter(s => s.teacherId === user.id);
-  const sessionVisible = (s: Session) => role === "SUPERADMIN" || (role === "TEACHER" ? s.teacherId === user.id : s.studentId === user.id || s.studentIds?.includes(user.id));
-  const assignmentVisible = (a: Assignment) => role === "SUPERADMIN" || (role === "TEACHER" ? a.teacherId === user.id : a.assignedStudentIds.includes(user.id));
-  const visibleAssignments = assignments.filter(assignmentVisible).map(a => ({ ...a, submissionsCount: submissions.filter(s => s.assignmentId === a.id).length, reviewedCount: submissions.filter(s => s.assignmentId === a.id && s.status === "REVIEWED").length }));
-  const visibleBoards = whiteboards.filter(w => role === "SUPERADMIN" || (role === "TEACHER" ? w.teacherId === user.id || myStudents.some(s => s.id === w.studentId) : w.studentId === user.id || sessions.some(s => s.whiteboardId === w.id && sessionVisible(s)) || assignments.some(a => a.whiteboardId === w.id && assignmentVisible(a))));
+  const managedTeachers = teachers.filter(t => t.managerId === user.id);
+  const managedTeacherIds = managedTeachers.map(t => t.id);
+  const managedStudents = students.filter(s => s.managerId === user.id || managedTeacherIds.includes(s.teacherId));
+  const managedStudentIds = managedStudents.map(s => s.id);
+
+  const sessionVisible = (s: Session) => {
+    if (role === "SUPERADMIN") return true;
+    if (role === "MANAGER") return managedTeacherIds.includes(s.teacherId) || managedStudentIds.includes(s.studentId) || (s.studentIds?.some(sid => managedStudentIds.includes(sid)) ?? false);
+    if (role === "TEACHER") return s.teacherId === user.id;
+    return s.studentId === user.id || (s.studentIds?.includes(user.id) ?? false);
+  };
+
+  const assignmentVisible = (a: Assignment) => {
+    if (role === "SUPERADMIN") return true;
+    if (role === "MANAGER") return managedTeacherIds.includes(a.teacherId);
+    if (role === "TEACHER") return a.teacherId === user.id;
+    return a.assignedStudentIds.includes(user.id);
+  };
+
+  const visibleAssignments = assignments.filter(assignmentVisible).map(a => ({
+    ...a,
+    submissionsCount: submissions.filter(s => s.assignmentId === a.id).length,
+    reviewedCount: submissions.filter(s => s.assignmentId === a.id && s.status === "REVIEWED").length,
+  }));
+
+  const visibleBoards = whiteboards.filter(w => {
+    if (role === "SUPERADMIN") return true;
+    if (role === "MANAGER") return managedTeacherIds.includes(w.teacherId || "") || managedStudentIds.includes(w.studentId || "");
+    if (role === "TEACHER") return w.teacherId === user.id || myStudents.some(s => s.id === w.studentId);
+    return w.studentId === user.id || sessions.some(s => s.whiteboardId === w.id && sessionVisible(s)) || assignments.some(a => a.whiteboardId === w.id && assignmentVisible(a));
+  });
+
   const subjectNames = Array.from(new Set([...teachers.flatMap(t => t.subjects), ...students.flatMap(s => s.subjects)])).filter(Boolean);
+
+  const updateCredentials = (targetRole: UserRole, id: string, newEmail: string, newPassword?: string) => {
+    const cleanEmail = (newEmail || "").trim();
+    const cleanPass = (newPassword || "").trim();
+    if (!cleanEmail) return;
+
+    if (targetRole === "MANAGER") {
+      const updates: Partial<Manager> = { email: cleanEmail };
+      if (cleanPass) updates.password = cleanPass;
+      updateManager(id, updates);
+    } else if (targetRole === "TEACHER") {
+      const updates: Partial<Teacher> = { email: cleanEmail };
+      if (cleanPass) updates.password = cleanPass;
+      updateTeacher(id, updates);
+    } else if (targetRole === "STUDENT") {
+      const updates: Partial<Student> = { email: cleanEmail };
+      if (cleanPass) updates.password = cleanPass;
+      updateStudent(id, updates);
+    }
+  };
 
   return (
     <LMSContext.Provider
       value={{
-        directory: { teachers, students },
-        role, user, switchRole, login, loading, saving, connectionError, createSession, updateSession, deleteAssignment,
+        directory: { teachers, students, managers },
+        role, user, switchRole, login, loginWithCredentials, updateCredentials, loading, saving, connectionError, createSession, updateSession, deleteAssignment,
         teachers: teachers.map(t => ({ ...t, totalStudents: students.filter(s => s.teacherId === t.id).length, totalSessions: sessions.filter(s => s.teacherId === t.id && s.status === "COMPLETED").length })),
-        students: role === "TEACHER" ? (myStudents.length > 0 ? myStudents : students) : role === "STUDENT" ? students.filter(s => s.id === user.id) : students,
+        students: role === "TEACHER" ? (myStudents.length > 0 ? myStudents : students) : role === "MANAGER" ? managedStudents : role === "STUDENT" ? students.filter(s => s.id === user.id) : students,
+        managers,
         subjects: subjects.length ? subjects : subjectNames.map(name => ({ id: name, name, code: name.slice(0, 3), color: "#6366f1", icon: "book", description: "", studentCount: students.filter(s => s.subjects.includes(name)).length, topics: [] })),
         sessions: sessions.filter(sessionVisible),
         whiteboards: visibleBoards,
         assignments: visibleAssignments,
-        submissions: submissions.filter(s => role === "SUPERADMIN" || (role === "STUDENT" ? s.studentId === user.id : visibleAssignments.some(a => a.id === s.assignmentId))),
-        materials: materials.filter(m => role === "SUPERADMIN" || (role === "TEACHER" ? m.teacherId === user.id : (m.assignedTo === "ALL" ? m.teacherId === students.find(s => s.id === user.id)?.teacherId : m.assignedTo.includes(user.id)))),
-        sessionReports: sessionReports.filter(r => role === "SUPERADMIN" || (role === "TEACHER" ? r.teacherId === user.id : r.studentId === user.id)),
+        submissions: submissions.filter(s => role === "SUPERADMIN" || (role === "MANAGER" ? managedStudentIds.includes(s.studentId) : role === "STUDENT" ? s.studentId === user.id : visibleAssignments.some(a => a.id === s.assignmentId))),
+        materials: materials.filter(m => role === "SUPERADMIN" || (role === "MANAGER" ? managedTeacherIds.includes(m.teacherId || "") : role === "TEACHER" ? m.teacherId === user.id : (m.assignedTo === "ALL" ? m.teacherId === students.find(s => s.id === user.id)?.teacherId : m.assignedTo.includes(user.id)))),
+        sessionReports: sessionReports.filter(r => role === "SUPERADMIN" || (role === "MANAGER" ? (managedTeacherIds.includes(r.teacherId) || managedStudentIds.includes(r.studentId)) : role === "TEACHER" ? (r.teacherId === user.id || myStudents.some(s => s.id === r.studentId)) : r.studentId === user.id)),
         notifications: notifications.filter(n => n.userId === user.id),
         activeSession,
         sessionStartTime,
@@ -552,7 +774,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         gradeSubmission,
         createSessionReport,
         getStudentTimetable: (studentId) => {
-          const allowed = role === "SUPERADMIN" || (role === "STUDENT" ? studentId === user.id
+          const allowed = role === "SUPERADMIN" || (role === "MANAGER" ? managedStudentIds.includes(studentId) : role === "STUDENT" ? studentId === user.id
             : myStudents.some(s => s.id === studentId) || sessions.some(s => s.teacherId === user.id && (s.studentId === studentId || s.studentIds?.includes(studentId))));
           return allowed ? studentTimetable(sessions, studentId) : [];
         },
@@ -560,8 +782,13 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         deleteStudyMaterial,
         addStudent,
         updateStudent,
+        deleteStudent,
         addTeacher,
         updateTeacher,
+        deleteTeacher,
+        addManager,
+        updateManager,
+        deleteManager,
         markNotificationRead,
         markAllNotificationsRead,
         isCommandPaletteOpen,
