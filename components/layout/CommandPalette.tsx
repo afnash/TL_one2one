@@ -79,7 +79,11 @@ export function CommandPalette() {
   );
 
   const matchingMaterials = materials.filter(
-    (m) => m.title.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q)
+    (m) =>
+      m.title.toLowerCase().includes(q) ||
+      m.subject.toLowerCase().includes(q) ||
+      (m.topic && m.topic.toLowerCase().includes(q)) ||
+      (m.keywords && m.keywords.some((k) => k.toLowerCase().includes(q)))
   );
 
   const handleNavigate = (path: string) => {

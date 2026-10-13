@@ -4,6 +4,7 @@ import React, { useState, ReactNode } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { CommandPalette } from "./CommandPalette";
+import { RAGStudyChatbot } from "@/components/chat/RAGStudyChatbot";
 import { useLMS } from "@/lib/store";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -95,6 +96,9 @@ export function AppShell({
 
       {/* Global Command Palette */}
       <CommandPalette />
+
+      {/* Global RAG AI Study Chatbot */}
+      <RAGStudyChatbot />
     </div>
   );
 }

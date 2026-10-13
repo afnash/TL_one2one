@@ -596,6 +596,8 @@ export function LMSProvider({ children }: { children: ReactNode }) {
   ) => {
     const newMat: StudyMaterial = {
       ...mat,
+      topic: mat.topic ? mat.topic.trim() : "",
+      keywords: Array.isArray(mat.keywords) ? mat.keywords.map(k => k.trim()).filter(Boolean) : [],
       teacherId: user.id,
       id: crypto.randomUUID(),
       uploadDate: new Date().toISOString().split("T")[0],

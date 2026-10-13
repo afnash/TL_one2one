@@ -62,6 +62,8 @@ export default function TeacherMaterialsPage() {
   // New material form
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(teacherSubjects[0] || "Mathematics");
+  const [topic, setTopic] = useState("");
+  const [keywords, setKeywords] = useState("");
   const [type, setType] = useState<StudyMaterial["type"]>("PDF");
   const [resourceUrl, setResourceUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -128,9 +130,16 @@ export default function TeacherMaterialsPage() {
     setUploadError("");
     try {
       const url = file ? await uploadMaterial(file) : safeResourceUrl(resourceUrl);
+      const parsedKeywords = keywords
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean);
+
       addStudyMaterial({
         title: title.trim(),
         subject: subject || (subjects[0]?.name ?? "Mathematics"),
+        topic: topic.trim(),
+        keywords: parsedKeywords,
         type,
         size: file ? (file.size / 1024 / 1024).toFixed(2) + " MB" : (type === "VIDEO" ? "Video Stream" : "Web Resource"),
         sizeBytes: file?.size || 0,
@@ -140,6 +149,8 @@ export default function TeacherMaterialsPage() {
       });
 
       setTitle("");
+      setTopic("");
+      setKeywords("");
       setDescription("");
       setIsUploadModalOpen(false);
       setFile(null);
@@ -245,7 +256,25 @@ export default function TeacherMaterialsPage() {
 
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                    <span className="text-[11px] font-semibold text-blue-600">{m.subject}</span>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                        {m.subject}
+                      </span>
+                      {m.topic && (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                          {m.topic}
+                        </span>
+                      )}
+                    </div>
+                    {m.keywords && m.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {m.keywords.map((kw, i) => (
+                          <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                            #{kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {m.description && (
@@ -501,6 +530,21 @@ export default function TeacherMaterialsPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Topic / Unit
+                    </label>
+                    <input
+                      type="text"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      placeholder="e.g. Calculus, Optics, Cell Division"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Resource Type
                     </label>
                     <select
@@ -513,6 +557,19 @@ export default function TeacherMaterialsPage() {
                       <option value="DOC">Notes (DOCX / PPT)</option>
                       <option value="IMAGE">Infographic / Diagram</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Keywords <span className="text-blue-600 font-semibold">(RAG Chatbot search tags)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={keywords}
+                      onChange={(e) => setKeywords(e.target.value)}
+                      placeholder="e.g. limits, derivatives, chain rule (comma separated)"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
                   </div>
                 </div>
 

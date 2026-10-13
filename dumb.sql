@@ -25,6 +25,29 @@ create index if not exists lms_students_teacher on public.lms_students ((data->>
 create index if not exists lms_students_manager on public.lms_students ((data->>'managerId'));
 create index if not exists lms_teachers_manager on public.lms_teachers ((data->>'managerId'));
 create index if not exists lms_sessions_teacher on public.lms_sessions ((data->>'teacherId'));
+create index if not exists lms_materials_subject on public.lms_materials ((data->>'subject'));
+create index if not exists lms_materials_topic on public.lms_materials ((data->>'topic'));
+create index if not exists lms_materials_keywords on public.lms_materials using gin ((data->'keywords'));
+
+-- RAG Study Materials Keyword & Context Search RPC
+create or replace function public.search_materials(p_query text)
+returns setof jsonb language sql stable set search_path = public as $$
+  select data from public.lms_materials
+  where p_query is not null and length(trim(p_query)) > 0
+    and (
+      data->>'subject' ilike '%' || trim(p_query) || '%'
+      or data->>'topic' ilike '%' || trim(p_query) || '%'
+      or data->>'title' ilike '%' || trim(p_query) || '%'
+      or data->>'description' ilike '%' || trim(p_query) || '%'
+      or exists (
+        select 1 from jsonb_array_elements_text(coalesce(data->'keywords', '[]'::jsonb)) kw
+        where kw ilike '%' || trim(p_query) || '%' or trim(p_query) ilike '%' || kw || '%'
+      )
+    )
+  order by updated_at desc;
+$$;
+revoke all on function public.search_materials(text) from public;
+grant execute on function public.search_materials(text) to anon, authenticated;
 
 -- Merge changed fields atomically. Board element deltas are merged under a row
 -- lock: simultaneous strokes with different IDs are never lost. Deleting a stroke

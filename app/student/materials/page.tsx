@@ -127,7 +127,25 @@ export default function StudentMaterialsPage() {
 
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                    <span className="text-[11px] font-semibold text-blue-600">{m.subject}</span>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                        {m.subject}
+                      </span>
+                      {m.topic && (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                          {m.topic}
+                        </span>
+                      )}
+                    </div>
+                    {m.keywords && m.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {m.keywords.map((kw, i) => (
+                          <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                            #{kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {m.description && (

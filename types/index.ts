@@ -279,6 +279,8 @@ export interface StudyMaterial {
   id: string;
   title: string;
   subject: string;
+  topic?: string;
+  keywords?: string[];
   type: "PDF" | "VIDEO" | "DOC" | "IMAGE" | "LINK";
   size: string;
   uploadDate: string;
