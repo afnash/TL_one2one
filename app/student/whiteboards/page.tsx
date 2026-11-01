@@ -5,13 +5,6 @@ import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
-import {
-  Layers,
-  Sparkles,
-  BookOpen,
-  Calendar,
-  Download,
-} from "lucide-react";
 
 export default function StudentWhiteboardsPage() {
   const { user, whiteboards, updateWhiteboardElements } = useLMS();
@@ -23,28 +16,21 @@ export default function StudentWhiteboardsPage() {
 
   return (
     <AppShell
-      headerTitle="My Subject Whiteboards"
-      headerSubtitle="Access your live class boards, homework, practice notes, and exported PDFs"
+      headerTitle="My whiteboards"
+      headerSubtitle="Your class boards, homework and practice notes"
     >
-      <div className="h-[calc(100vh-140px)] flex flex-col space-y-3">
-        {/* Top Board Switcher Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-2xl shadow-2xs">
+      <div className="flex h-[calc(100vh-140px)] flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
           <StudentBoardSelector
             currentWhiteboardId={activeBoardId}
             onSelectBoard={(id) => setActiveBoardId(id)}
             selectedStudentId={user.id}
             isTeacherMode={false}
           />
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 hidden sm:inline">
-              Continuous Work Supported
-            </span>
-          </div>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Changes save automatically</span>
         </div>
 
-        {/* Interactive Infinite Canvas */}
-        <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs">
+        <div className="h-full w-full flex-1 overflow-hidden rounded-xl border bg-card">
           <WhiteboardCanvas
             key={currentBoard?.id}
             initialWhiteboard={currentBoard}

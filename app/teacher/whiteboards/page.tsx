@@ -5,16 +5,6 @@ import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { StudentBoardSelector } from "@/components/whiteboard/StudentBoardSelector";
-import {
-  Layers,
-  Plus,
-  Search,
-  FileDown,
-  Sparkles,
-  BookOpen,
-  GraduationCap,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function TeacherWhiteboardsPage() {
   const { whiteboards, students, updateWhiteboardElements } = useLMS();
@@ -27,12 +17,11 @@ export default function TeacherWhiteboardsPage() {
 
   return (
     <AppShell
-      headerTitle="Subject & Student Whiteboards"
-      headerSubtitle="Inspect, create, and annotate subject-specific whiteboards for each 1-to-1 student"
+      headerTitle="Whiteboards"
+      headerSubtitle="Open, create and annotate each student's boards"
     >
-      <div className="h-[calc(100vh-140px)] flex flex-col space-y-3">
-        {/* Top Board Switcher Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-2xl shadow-2xs">
+      <div className="flex h-[calc(100vh-140px)] flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
           <StudentBoardSelector
             currentWhiteboardId={activeBoardId}
             onSelectBoard={(id) => setActiveBoardId(id)}
@@ -40,16 +29,10 @@ export default function TeacherWhiteboardsPage() {
             onSelectStudent={(id) => setSelectedStudentId(id)}
             isTeacherMode={true}
           />
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 hidden sm:inline">
-              Canvas Auto-saved
-            </span>
-          </div>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Changes save automatically</span>
         </div>
 
-        {/* Interactive Infinite Whiteboard */}
-        <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs">
+        <div className="h-full w-full flex-1 overflow-hidden rounded-xl border bg-card">
           <WhiteboardCanvas
             key={currentBoard?.id}
             initialWhiteboard={currentBoard}

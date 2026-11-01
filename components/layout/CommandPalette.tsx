@@ -1,26 +1,55 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { BookOpen, FileText, GraduationCap, Layers, Users, Video } from "lucide-react";
 import { useLMS } from "@/lib/store";
+import { navItemsFor } from "./AppSidebar";
 import {
-  Search,
-  Users,
-  Video,
-  Layers,
-  BookOpen,
-  FileText,
-  Sparkles,
-  ArrowRight,
-  X,
-  Command,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+
+// Where each kind of record leads, per role. A missing entry means that role does not
+// get that group in the palette.
+const ROUTES: Record<string, Partial<Record<"students" | "teachers" | "assignments" | "sessions" | "materials" | "whiteboards", (id: string) => string>>> = {
+  TEACHER: {
+    students: (id) => `/teacher/students/${id}`,
+    assignments: () => "/teacher/assignments",
+    sessions: () => "/teacher/sessions",
+    materials: () => "/teacher/materials",
+    whiteboards: () => "/teacher/whiteboards",
+  },
+  STUDENT: {
+    assignments: (id) => `/student/assignments/${id}`,
+    sessions: () => "/student/sessions",
+    materials: () => "/student/materials",
+    whiteboards: () => "/student/whiteboards",
+  },
+  MANAGER: {
+    students: () => "/manager/students",
+    teachers: () => "/manager/teachers",
+    sessions: () => "/manager/sessions",
+  },
+  SUPERADMIN: {
+    students: () => "/admin/students",
+    teachers: () => "/admin/teachers",
+    assignments: () => "/admin/assignments",
+    sessions: () => "/admin/sessions",
+    materials: () => "/admin/materials",
+  },
+};
 
 export function CommandPalette() {
   const router = useRouter();
   const {
     role,
+    directory,
     students,
     teachers,
     sessions,
@@ -31,278 +60,143 @@ export function CommandPalette() {
     setIsCommandPaletteOpen,
   } = useLMS();
 
-  const [query, setQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // Global Cmd+K / Ctrl+K listener
+  // Ctrl/Cmd+K toggles the palette. Escape is handled by the dialog.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsCommandPaletteOpen(!isCommandPaletteOpen);
       }
-      if (e.key === "Escape" && isCommandPaletteOpen) {
-        setIsCommandPaletteOpen(false);
-      }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [isCommandPaletteOpen, setIsCommandPaletteOpen]);
 
-  useEffect(() => {
-    if (isCommandPaletteOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      setQuery("");
-    }
-  }, [isCommandPaletteOpen]);
-
-  if (!isCommandPaletteOpen) return null;
-
-  const q = query.toLowerCase();
-
-  // Search across entities
-  const matchingStudents = students.filter(
-    (s) => s.name.toLowerCase().includes(q) || s.subjects.some((sub) => sub.toLowerCase().includes(q))
-  );
-
-  const matchingAssignments = assignments.filter(
-    (a) => a.title.toLowerCase().includes(q) || a.subject.toLowerCase().includes(q)
-  );
-
-  const matchingSessions = sessions.filter(
-    (s) => s.studentName.toLowerCase().includes(q) || s.subject.toLowerCase().includes(q) || s.topic.toLowerCase().includes(q)
-  );
-
-  const matchingWhiteboards = whiteboards.filter(
-    (w) => w.title.toLowerCase().includes(q) || w.subject.toLowerCase().includes(q)
-  );
-
-  const matchingMaterials = materials.filter(
-    (m) =>
-      m.title.toLowerCase().includes(q) ||
-      m.subject.toLowerCase().includes(q) ||
-      (m.topic && m.topic.toLowerCase().includes(q)) ||
-      (m.keywords && m.keywords.some((k) => k.toLowerCase().includes(q)))
-  );
-
-  const handleNavigate = (path: string) => {
+  const routes = ROUTES[role] ?? {};
+  const go = (path: string) => {
     setIsCommandPaletteOpen(false);
     router.push(path);
   };
 
+  const pages = navItemsFor(role);
+  // Admins and managers search the directory; teachers and students their own scoped lists.
+  const studentList = role === "SUPERADMIN" || role === "MANAGER" ? directory.students : students;
+  const teacherList = role === "SUPERADMIN" || role === "MANAGER" ? directory.teachers : teachers;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-      <div
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-150"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Search Header Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          <Search className="w-5 h-5 text-slate-400 shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search students, assignments, live sessions, whiteboards, materials..."
-            className="w-full text-sm bg-transparent border-none focus:outline-none text-slate-800 placeholder-slate-400"
-          />
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded">
-            ESC
-          </kbd>
-          <button
-            onClick={() => setIsCommandPaletteOpen(false)}
-            className="p-1 hover:bg-slate-200 rounded-md text-slate-400"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <CommandDialog
+      open={isCommandPaletteOpen}
+      onOpenChange={setIsCommandPaletteOpen}
+      title="Search"
+      description="Jump to a page or find a student, lesson, assignment or material."
+    >
+      <CommandInput placeholder="Search pages, people, lessons and materials" />
+      <CommandList>
+        <CommandEmpty>Nothing matches your search.</CommandEmpty>
 
-        {/* Results List */}
-        <div className="overflow-y-auto p-3 space-y-4 text-xs">
-          {/* Quick Actions */}
-          {!query && (
-            <div>
-              <p className="px-2 pb-1.5 font-semibold text-slate-400 uppercase tracking-wider text-[11px]">
-                Quick Actions
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {role === "TEACHER" ? (
-                  <>
-                    <button
-                      onClick={() => handleNavigate("/teacher/sessions")}
-                      className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
-                    >
-                      <div className="p-1.5 rounded-md bg-indigo-100 text-indigo-700">
-                        <Video className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">Open live sessions</p>
-                        <p className="text-[11px] text-slate-500">Live 1-to-1 Classroom</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleNavigate("/teacher/assignments/new")}
-                      className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
-                    >
-                      <div className="p-1.5 rounded-md bg-emerald-100 text-emerald-700">
-                        <BookOpen className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">Create New Assignment</p>
-                        <p className="text-[11px] text-slate-500">With Whiteboard questions</p>
-                      </div>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => handleNavigate("/student/sessions")}
-                      className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
-                    >
-                      <div className="p-1.5 rounded-md bg-indigo-100 text-indigo-700">
-                        <Video className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">Join Live Class</p>
-                        <p className="text-[11px] text-slate-500">Your scheduled classes</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleNavigate("/student/whiteboards")}
-                      className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-indigo-50/70 text-slate-700 text-left transition-colors"
-                    >
-                      <div className="p-1.5 rounded-md bg-amber-100 text-amber-700">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">Open Whiteboards</p>
-                        <p className="text-[11px] text-slate-500">Practice and Homework</p>
-                      </div>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+        <CommandGroup heading="Pages">
+          {pages.map(([label, href, Icon]) => (
+            <CommandItem key={href} value={`page ${label}`} onSelect={() => go(href)}>
+              <Icon />
+              {label}
+            </CommandItem>
+          ))}
+        </CommandGroup>
 
-          {/* Students */}
-          {matchingStudents.length > 0 && (
-            <div>
-              <p className="px-2 pb-1 font-semibold text-slate-400 uppercase tracking-wider text-[11px]">
-                Students ({matchingStudents.length})
-              </p>
-              <div className="space-y-1">
-                {matchingStudents.map((st) => (
-                  <button
-                    key={st.id}
-                    onClick={() => handleNavigate(`/teacher/students/${st.id}`)}
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <img src={st.avatar} alt={st.name} className="w-6 h-6 rounded-full object-cover" />
-                      <div>
-                        <span className="font-semibold text-slate-900">{st.name}</span>
-                        <span className="text-slate-400 ml-2">{st.grade} • {st.subjects.join(", ")}</span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-medium text-indigo-600 flex items-center gap-1">
-                      View Profile <ArrowRight className="w-3 h-3" />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        {routes.students && studentList.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Students">
+              {studentList.map((s) => (
+                <CommandItem key={s.id} value={`student ${s.name} ${s.email} ${s.subjects?.join(" ")}`} onSelect={() => go(routes.students!(s.id))}>
+                  <Users />
+                  <span>{s.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{s.grade}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
-          {/* Assignments */}
-          {matchingAssignments.length > 0 && (
-            <div>
-              <p className="px-2 pb-1 font-semibold text-slate-400 uppercase tracking-wider text-[11px]">
-                Assignments ({matchingAssignments.length})
-              </p>
-              <div className="space-y-1">
-                {matchingAssignments.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() =>
-                      handleNavigate(
-                        role === "TEACHER" ? `/teacher/assignments` : `/student/assignments/${a.id}`
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1 rounded bg-emerald-50 text-emerald-600">
-                        <BookOpen className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-900">{a.title}</span>
-                        <span className="text-slate-400 ml-2">{a.subject} • Due: {a.dueDate}</span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      {a.questions.length} questions
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        {routes.teachers && teacherList.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Teachers">
+              {teacherList.map((t) => (
+                <CommandItem key={t.id} value={`teacher ${t.name} ${t.email} ${t.subjects?.join(" ")}`} onSelect={() => go(routes.teachers!(t.id))}>
+                  <GraduationCap />
+                  <span>{t.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{t.subjects?.join(", ")}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
-          {/* Whiteboards */}
-          {matchingWhiteboards.length > 0 && (
-            <div>
-              <p className="px-2 pb-1 font-semibold text-slate-400 uppercase tracking-wider text-[11px]">
-                Whiteboards ({matchingWhiteboards.length})
-              </p>
-              <div className="space-y-1">
-                {matchingWhiteboards.map((w) => (
-                  <button
-                    key={w.id}
-                    onClick={() =>
-                      handleNavigate(
-                        role === "TEACHER" ? `/teacher/whiteboards` : `/student/whiteboards`
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1 rounded bg-indigo-50 text-indigo-600">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-900">{w.title}</span>
-                        <span className="text-slate-400 ml-2">{w.subject}</span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] text-slate-400">{w.category.replace("_", " ")}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        {routes.sessions && sessions.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Lessons">
+              {sessions.map((s) => (
+                <CommandItem key={s.id} value={`lesson ${s.studentName} ${s.teacherName} ${s.subject} ${s.topic}`} onSelect={() => go(routes.sessions!(s.id))}>
+                  <Video />
+                  <span>{s.subject}: {s.topic}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{s.date}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
-          {/* Empty search */}
-          {query &&
-            matchingStudents.length === 0 &&
-            matchingAssignments.length === 0 &&
-            matchingWhiteboards.length === 0 &&
-            matchingMaterials.length === 0 && (
-              <div className="py-8 text-center text-slate-400">
-                <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p>No matches found for "{query}"</p>
-              </div>
-            )}
-        </div>
+        {routes.assignments && assignments.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Assignments">
+              {assignments.map((a) => (
+                <CommandItem key={a.id} value={`assignment ${a.title} ${a.subject}`} onSelect={() => go(routes.assignments!(a.id))}>
+                  <BookOpen />
+                  <span>{a.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Due {a.dueDate}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
-        {/* Footer info */}
-        <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Navigate with mouse or Tab</span>
-          <span>Antigravity 1-to-1 LMS</span>
-        </div>
-      </div>
-    </div>
+        {routes.materials && materials.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Materials">
+              {materials.map((m) => (
+                <CommandItem
+                  key={m.id}
+                  value={`material ${m.title} ${m.subject} ${m.topic ?? ""} ${m.keywords?.join(" ") ?? ""}`}
+                  onSelect={() => go(routes.materials!(m.id))}
+                >
+                  <FileText />
+                  <span>{m.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{m.subject}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+
+        {routes.whiteboards && whiteboards.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Whiteboards">
+              {whiteboards.map((w) => (
+                <CommandItem key={w.id} value={`whiteboard ${w.title} ${w.subject}`} onSelect={() => go(routes.whiteboards!(w.id))}>
+                  <Layers />
+                  <span>{w.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{w.subject}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+      </CommandList>
+    </CommandDialog>
   );
 }

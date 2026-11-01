@@ -6,10 +6,6 @@ import {
   X,
   ExternalLink,
   Download,
-  Printer,
-  Maximize2,
-  ZoomIn,
-  ZoomOut,
   RefreshCw,
 } from "lucide-react";
 import { safeResourceUrl } from "@/lib/supabase";
@@ -149,7 +145,7 @@ export function PDFViewerModal({
 
         {/* Footer Bar */}
         <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
-          <span>OneToOne Document Viewer</span>
+          <span>sofiaa Document Viewer</span>
           <div className="flex items-center gap-3">
             <button
               type="button"

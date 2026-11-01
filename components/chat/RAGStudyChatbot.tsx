@@ -1,31 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, ExternalLink, Eye, FileText, Play, RotateCcw, SendHorizontal, Video, X } from "lucide-react";
 import { useLMS } from "@/lib/store";
 import { StudyMaterial } from "@/types";
 import { searchStudyMaterials, buildGroundedAnswer } from "@/lib/rag-search";
 import { safeResourceUrl } from "@/lib/supabase";
 import { PDFViewerModal } from "@/components/media/PDFViewerModal";
 import { VideoPlayerModal } from "@/components/media/VideoPlayer";
-import {
-  MessageSquare,
-  Sparkles,
-  Send,
-  X,
-  FileText,
-  Video,
-  ExternalLink,
-  Eye,
-  Play,
-  RotateCcw,
-  BookOpen,
-  Tag,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  ChevronDown,
-  Bot,
-} from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -35,7 +21,65 @@ interface ChatMessage {
   timestamp: string;
   matchedDocs?: StudyMaterial[];
   matchedKeywords?: string[];
-  isSearching?: boolean;
+}
+
+type ModalState = { url: string; title: string; subject?: string; description?: string; type?: string } | null;
+
+const WELCOME: ChatMessage = {
+  id: "welcome",
+  sender: "bot",
+  text: "Ask about a topic or keyword. I answer only from the study materials your teachers have uploaded, and show you where each answer comes from.",
+  timestamp: "",
+};
+
+const isVideoDoc = (doc: StudyMaterial) =>
+  doc.type === "VIDEO" || /youtube|youtu\.be/.test(doc.url) || /\.(mp4|webm|mov)(\?.*)?$/i.test(doc.url);
+
+/** Inline **bold** and `code`. Everything else is plain text, so nothing is injected as HTML. */
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") ? (
+          <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+        ) : part.startsWith("`") ? (
+          <code key={i} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">{part.slice(1, -1)}</code>
+        ) : (
+          <React.Fragment key={i}>{part}</React.Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/** Tiny markdown subset used by the answers: headings, bullets, quotes, paragraphs. */
+function Markdown({ text }: { text: string }) {
+  const blocks: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = () => {
+    if (bullets.length) {
+      blocks.push(
+        <ul key={`ul-${blocks.length}`} className="ml-4 list-disc space-y-0.5">
+          {bullets.map((b, i) => (
+            <li key={i}><Inline text={b} /></li>
+          ))}
+        </ul>,
+      );
+      bullets = [];
+    }
+  };
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) { flush(); continue; }
+    if (line.startsWith("- ")) { bullets.push(line.slice(2)); continue; }
+    flush();
+    if (line.startsWith("#")) blocks.push(<p key={blocks.length} className="font-semibold"><Inline text={line.replace(/^#+\s*/, "")} /></p>);
+    else if (line.startsWith(">")) blocks.push(<p key={blocks.length} className="border-l-2 pl-3 text-muted-foreground"><Inline text={line.replace(/^>\s*/, "")} /></p>);
+    else blocks.push(<p key={blocks.length}><Inline text={line} /></p>);
+  }
+  flush();
+  return <div className="flex flex-col gap-2">{blocks}</div>;
 }
 
 export function RAGStudyChatbot() {
@@ -43,106 +87,67 @@ export function RAGStudyChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputQuery, setInputQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
+  const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [videoModal, setVideoModal] = useState<ModalState>(null);
+  const [docModal, setDocModal] = useState<ModalState>(null);
 
-  // Modal previews
-  const [activeVideoModal, setActiveVideoModal] = useState<{
-    url: string;
-    title: string;
-    subject?: string;
-    description?: string;
-  } | null>(null);
-
-  const [activeDocModal, setActiveDocModal] = useState<{
-    url: string;
-    title: string;
-    subject?: string;
-    description?: string;
-    type?: string;
-  } | null>(null);
-
-  // Initial welcome message
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome-1",
-      sender: "bot",
-      text: "👋 Hello! I am your **Context-Grounded AI Study Assistant**.\n\nAsk me about any topic, concept, or keywords. I will search our Supabase study library and reply **strictly using verified uploaded documents and videos**.",
-      timestamp: "Just now",
-    },
-  ]);
-
-  // Extract unique keywords and topics from available materials for quick suggestion pills
-  const availableTags = React.useMemo(() => {
+  const suggestions = useMemo(() => {
     const tags = new Set<string>();
     materials.forEach((m) => {
       if (m.topic) tags.add(m.topic.trim());
-      if (Array.isArray(m.keywords)) {
-        m.keywords.forEach((k) => {
-          if (k && k.trim()) tags.add(k.trim());
-        });
-      }
+      m.keywords?.forEach((k) => k?.trim() && tags.add(k.trim()));
     });
-    return Array.from(tags).slice(0, 8);
+    return Array.from(tags).slice(0, 6);
   }, [materials]);
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [isOpen, messages]);
+    if (!isOpen) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 180);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setIsOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isOpen]);
 
-  const handleSendMessage = async (queryToSend?: string) => {
-    const q = (queryToSend || inputQuery).trim();
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isSearching]);
+
+  const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const send = async (queryToSend?: string) => {
+    const q = (queryToSend ?? inputQuery).trim();
     if (!q || isSearching) return;
-
-    const userMsgId = crypto.randomUUID();
-    const botMsgId = crypto.randomUUID();
-    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    // Add user message
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: userMsgId,
-        sender: "user",
-        text: q,
-        timestamp: time,
-      },
-    ]);
-
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: "user", text: q, timestamp: now() }]);
     setInputQuery("");
     setIsSearching(true);
-
     try {
-      // Perform RAG search on Supabase table and materials
       const matches = await searchStudyMaterials(q, materials);
       const grounded = buildGroundedAnswer(q, matches);
-
-      const allMatchedKeywords = Array.from(
-        new Set(matches.flatMap((m) => m.matchedKeywords))
-      );
-
       setMessages((prev) => [
         ...prev,
         {
-          id: botMsgId,
+          id: crypto.randomUUID(),
           sender: "bot",
-          text: grounded.reply,
+          // The cards below carry the document details, so only the summary sentence is shown.
+          text: grounded.matchedDocs.length ? grounded.reply.split("\n")[0] : grounded.reply,
           matchedDocs: grounded.matchedDocs,
-          matchedKeywords: allMatchedKeywords,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          matchedKeywords: Array.from(new Set(matches.flatMap((m) => m.matchedKeywords))),
+          timestamp: now(),
         },
       ]);
-    } catch (err: any) {
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
-          id: botMsgId,
+          id: crypto.randomUUID(),
           sender: "bot",
-          text: `⚠️ An error occurred while searching documents: ${err?.message || "Unknown error"}. Please try again.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Something went wrong while searching: ${err instanceof Error ? err.message : "unknown error"}. Please try again.`,
+          timestamp: now(),
         },
       ]);
     } finally {
@@ -150,281 +155,199 @@ export function RAGStudyChatbot() {
     }
   };
 
-  const handleOpenDoc = (doc: StudyMaterial) => {
-    const isVideo =
-      doc.type === "VIDEO" ||
-      doc.url.includes("youtube") ||
-      doc.url.includes("youtu.be") ||
-      doc.url.match(/\.(mp4|webm|mov)(\?.*)?$/i);
-
-    if (isVideo) {
-      setActiveVideoModal({
-        url: doc.url,
-        title: doc.title,
-        subject: doc.subject,
-        description: doc.description,
-      });
-    } else {
-      setActiveDocModal({
-        url: doc.url,
-        title: doc.title,
-        subject: doc.subject,
-        description: doc.description,
-        type: doc.type,
-      });
-    }
+  const openDoc = (doc: StudyMaterial) => {
+    const info = { url: doc.url, title: doc.title, subject: doc.subject, description: doc.description, type: doc.type };
+    if (isVideoDoc(doc)) setVideoModal(info);
+    else setDocModal(info);
   };
 
   return (
     <>
-      {/* Floating Launcher Button */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setIsOpen((prev) => !prev)}
-          className={cn(
-            "group flex items-center gap-2.5 px-4 py-3 rounded-full shadow-xl transition-all duration-300 border",
-            isOpen
-              ? "bg-slate-900 text-white border-slate-700 hover:bg-slate-800 scale-95"
-              : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 hover:shadow-2xl hover:scale-105"
-          )}
-          aria-label="Toggle RAG AI Study Chatbot"
-        >
-          <div className="relative">
-            <Bot className="w-5 h-5 transition-transform group-hover:rotate-12" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse border-2 border-white" />
-          </div>
-          <span className="text-xs font-bold tracking-wide">
-            {isOpen ? "Close Assistant" : "Ask Study Documents"}
-          </span>
-        </button>
-      </div>
+      <Button
+        size="lg"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-controls="study-assistant"
+        className="fixed bottom-5 right-5 z-40 h-12 rounded-full px-4 shadow-lg shadow-primary/20 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
+      >
+        {isOpen ? <X data-icon="inline-start" /> : <Bot data-icon="inline-start" />}
+        <span className="hidden sm:inline">{isOpen ? "Close" : "Ask the materials"}</span>
+        <span className="sr-only sm:hidden">{isOpen ? "Close assistant" : "Open study assistant"}</span>
+      </Button>
 
-      {/* Chatbot Window Modal / Drawer */}
-      {isOpen && (
-        <div className="fixed bottom-22 right-6 z-40 w-[92vw] sm:w-[440px] md:w-[480px] h-[580px] max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-          {/* Header */}
-          <div className="p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-between shrink-0 shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold leading-none">RAG Study Chatbot</h3>
-                  <span className="text-[10px] bg-emerald-400/20 text-emerald-200 px-1.5 py-0.5 rounded-full font-semibold border border-emerald-400/30">
-                    Live Context
-                  </span>
-                </div>
-                <p className="text-[11px] text-blue-100/90 mt-0.5">
-                  Replies strictly from verified study materials
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() =>
-                  setMessages([
-                    {
-                      id: "welcome-reset",
-                      sender: "bot",
-                      text: "Conversation reset. What document or topic would you like to explore?",
-                      timestamp: "Just now",
-                    },
-                  ])
-                }
-                title="Reset conversation"
-                className="p-1.5 hover:bg-white/15 rounded-lg text-blue-100 hover:text-white transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 hover:bg-white/15 rounded-lg text-blue-100 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      <section
+        id="study-assistant"
+        role="dialog"
+        aria-label="Study assistant"
+        aria-hidden={!isOpen}
+        inert={!isOpen}
+        className={cn(
+          "fixed bottom-20 right-5 z-40 flex h-[560px] max-h-[75vh] w-[calc(100vw-2.5rem)] origin-bottom-right flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl sm:w-[420px]",
+          "transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none",
+          isOpen ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none translate-y-3 scale-95 opacity-0",
+        )}
+      >
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar className="size-9">
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                <Bot className="size-4" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold leading-tight">Study assistant</h2>
+              <p className="truncate text-xs text-muted-foreground">Answers only from uploaded materials</p>
             </div>
           </div>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Start a new conversation"
+              onClick={() => setMessages([WELCOME])}
+            >
+              <RotateCcw />
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Close assistant" onClick={() => setIsOpen(false)}>
+              <X />
+            </Button>
+          </div>
+        </header>
 
-          {/* Quick Tag Recommendations */}
-          {availableTags.length > 0 && (
-            <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
-              <span className="text-slate-400 font-medium shrink-0 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-slate-400" /> Suggestions:
-              </span>
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => handleSendMessage(`Tell me about ${tag}`)}
-                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-colors shrink-0 shadow-2xs font-medium"
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Chat Messages Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto bg-muted/30 px-4 py-4" aria-live="polite">
+          <div className="flex flex-col gap-4">
             {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={cn(
-                  "flex flex-col",
-                  msg.sender === "user" ? "items-end" : "items-start"
+                  "flex animate-in fade-in-0 slide-in-from-bottom-1 flex-col duration-200",
+                  msg.sender === "user" ? "items-end" : "items-start",
                 )}
               >
                 <div
                   className={cn(
-                    "max-w-[88%] rounded-2xl p-3.5 text-xs shadow-2xs leading-relaxed",
+                    "max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                     msg.sender === "user"
-                      ? "bg-blue-600 text-white rounded-br-xs font-medium"
-                      : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs"
+                      ? "rounded-br-md bg-primary text-primary-foreground"
+                      : "rounded-bl-md border bg-card text-card-foreground",
                   )}
                 >
-                  {/* Message formatted content */}
-                  <div className="whitespace-pre-wrap space-y-2">
-                    {msg.text}
-                  </div>
+                  {msg.sender === "bot" ? <Markdown text={msg.text} /> : msg.text}
+                </div>
 
-                  {/* Matched Document Cards (RAG citations) */}
-                  {msg.matchedDocs && msg.matchedDocs.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Referenced Study Documents ({msg.matchedDocs.length})
-                      </p>
-                      {msg.matchedDocs.map((doc) => {
-                        const isVideo =
-                          doc.type === "VIDEO" ||
-                          doc.url.includes("youtube") ||
-                          doc.url.includes("youtu.be") ||
-                          doc.url.match(/\.(mp4|webm|mov)(\?.*)?$/i);
-
-                        return (
-                          <div
-                            key={doc.id}
-                            className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-blue-300 transition-all text-left flex flex-col gap-1.5"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-slate-900 truncate text-[11px]">
-                                {doc.title}
-                              </span>
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">
-                                {isVideo ? "VIDEO" : doc.type}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-500">
-                              <span className="font-semibold text-blue-600">{doc.subject}</span>
-                              {doc.topic && (
-                                <span className="text-emerald-700 bg-emerald-50 px-1 rounded font-medium">
-                                  {doc.topic}
-                                </span>
-                              )}
-                            </div>
-
-                            {doc.keywords && doc.keywords.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-0.5">
-                                {doc.keywords.map((kw, i) => (
-                                  <span
-                                    key={i}
-                                    className="text-[9px] bg-slate-200/70 text-slate-700 px-1 py-0.2 rounded font-mono"
-                                  >
-                                    #{kw}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Action Buttons to open document / video */}
-                            <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 mt-1">
-                              <button
-                                onClick={() => handleOpenDoc(doc)}
-                                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-                              >
-                                {isVideo ? <Play className="w-3 h-3 fill-current" /> : <Eye className="w-3 h-3" />}
-                                <span>{isVideo ? "Watch Video" : "View Document"}</span>
-                              </button>
-
-                              <a
-                                href={safeResourceUrl(doc.url)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-[10px] font-semibold text-slate-600 hover:text-blue-600 transition-colors"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Direct Link</span>
-                              </a>
+                {msg.matchedDocs && msg.matchedDocs.length > 0 && (
+                  <ul className="mt-2 flex w-[90%] flex-col gap-2">
+                    {msg.matchedDocs.map((doc, i) => {
+                      const video = isVideoDoc(doc);
+                      const Icon = video ? Video : FileText;
+                      return (
+                        <li
+                          key={doc.id}
+                          style={{ animationDelay: `${i * 50}ms` }}
+                          className="flex animate-in fade-in-0 slide-in-from-bottom-1 flex-col gap-2 rounded-xl border bg-card p-3 duration-200 fill-mode-both"
+                        >
+                          <div className="flex items-start gap-3">
+                            <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{doc.title}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {[doc.subject, doc.topic, video ? "Video" : doc.type].filter(Boolean).join(" · ")}
+                              </p>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 px-1">
-                  {msg.timestamp}
-                </span>
+                          <div className="flex items-center gap-1">
+                            <Button size="xs" onClick={() => openDoc(doc)}>
+                              {video ? <Play data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
+                              {video ? "Watch" : "View"}
+                            </Button>
+                            <Button size="xs" variant="ghost" asChild>
+                              <a href={safeResourceUrl(doc.url)} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink data-icon="inline-start" />
+                                Open
+                              </a>
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {msg.matchedKeywords && msg.matchedKeywords.length > 0 && (
+                  <p className="mt-2 max-w-[90%] text-xs text-muted-foreground">
+                    Matched: {msg.matchedKeywords.slice(0, 6).join(", ")}
+                  </p>
+                )}
+                {msg.timestamp && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{msg.timestamp}</span>}
               </div>
             ))}
 
             {isSearching && (
-              <div className="flex items-center gap-2 p-3 bg-white rounded-2xl border border-slate-200 text-xs text-slate-500 w-fit animate-pulse shadow-2xs">
-                <Sparkles className="w-4 h-4 text-blue-600 animate-spin" />
-                <span>Searching Supabase materials by keywords...</span>
+              <div
+                className="flex w-56 animate-in fade-in-0 flex-col gap-2 rounded-2xl rounded-bl-md border bg-card px-3.5 py-3 duration-150"
+                role="status"
+                aria-label="Searching the materials"
+              >
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-3/5" />
               </div>
             )}
-            <div ref={messagesEndRef} />
+            <div ref={endRef} />
           </div>
+        </div>
 
-          {/* Input Bar */}
+        <footer className="shrink-0 border-t bg-card p-3">
+          {suggestions.length > 0 && messages.length <= 1 && (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1" aria-label="Suggested topics">
+              {suggestions.map((tag) => (
+                <Button key={tag} variant="outline" size="xs" className="shrink-0" onClick={() => send(`Tell me about ${tag}`)}>
+                  {tag}
+                </Button>
+              ))}
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSendMessage();
+              send();
             }}
-            className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0"
           >
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              placeholder="Ask about a topic or keywords (e.g. Newton's laws)..."
-              disabled={isSearching}
-              className="flex-1 px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900 bg-slate-50/50"
-            />
-            <button
-              type="submit"
-              disabled={!inputQuery.trim() || isSearching}
-              className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+            <InputGroup>
+              <InputGroupInput
+                ref={inputRef}
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                placeholder="Ask about a topic or keyword"
+                aria-label="Your question"
+                disabled={isSearching}
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton type="submit" size="icon-xs" variant="default" aria-label="Send" disabled={!inputQuery.trim() || isSearching}>
+                  <SendHorizontal />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
           </form>
-        </div>
-      )}
+        </footer>
+      </section>
 
-      {/* Video Modal Preview for Chatbot */}
       <VideoPlayerModal
-        isOpen={!!activeVideoModal}
-        onClose={() => setActiveVideoModal(null)}
-        url={activeVideoModal?.url || ""}
-        title={activeVideoModal?.title || ""}
-        subject={activeVideoModal?.subject}
-        description={activeVideoModal?.description}
+        isOpen={!!videoModal}
+        onClose={() => setVideoModal(null)}
+        url={videoModal?.url || ""}
+        title={videoModal?.title || ""}
+        subject={videoModal?.subject}
+        description={videoModal?.description}
       />
-
-      {/* PDF Modal Preview for Chatbot */}
       <PDFViewerModal
-        isOpen={!!activeDocModal}
-        onClose={() => setActiveDocModal(null)}
-        url={activeDocModal?.url || ""}
-        title={activeDocModal?.title || ""}
-        subject={activeDocModal?.subject}
-        description={activeDocModal?.description}
-        type={activeDocModal?.type}
+        isOpen={!!docModal}
+        onClose={() => setDocModal(null)}
+        url={docModal?.url || ""}
+        title={docModal?.title || ""}
+        subject={docModal?.subject}
+        description={docModal?.description}
+        type={docModal?.type}
       />
     </>
   );

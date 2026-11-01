@@ -41,13 +41,13 @@ export function WhiteboardWorkspace({
   const showTeacherTools = mode === "ASSIGNMENT_REVIEW" || (isTeacher && mode !== "STUDENT_WORK");
 
   if (!activeBoard) {
-    return <div className="grid h-full place-items-center text-sm text-slate-500">No whiteboard available.</div>;
+    return <div className="grid h-full place-items-center text-sm text-muted-foreground">No whiteboard available.</div>;
   }
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-1.5", className)}>
       {showSelector && (
-        <div className="glass-card flex flex-wrap items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-2.5 py-1.5">
           <StudentBoardSelector
             currentWhiteboardId={activeBoard.id}
             onSelectBoard={setActiveBoardId}
@@ -55,10 +55,10 @@ export function WhiteboardWorkspace({
             onSelectStudent={setSelectedStudentId}
             isTeacherMode={isTeacher}
           />
-          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Shared board • auto-syncs live</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">Shared board. Changes sync live.</span>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-card">
         <WhiteboardCanvas
           key={activeBoard.id}
           initialWhiteboard={activeBoard}

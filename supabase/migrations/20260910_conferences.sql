@@ -72,7 +72,11 @@ $$;
 revoke all on function public.conference_create(text,text,text) from public;
 revoke all on function public.conference_read(text) from public;
 revoke all on function public.conference_update(text,text,integer,text,jsonb) from public;
-grant execute on function public.conference_create(text,text,text) to anon, authenticated;
-grant execute on function public.conference_read(text) to anon, authenticated;
-grant execute on function public.conference_update(text,text,integer,text,jsonb) to anon, authenticated;
+-- Only the Next.js server (service_role) may call these, matching supabase/schema.sql.
+revoke all on function public.conference_create(text,text,text) from anon, authenticated;
+revoke all on function public.conference_read(text) from anon, authenticated;
+revoke all on function public.conference_update(text,text,integer,text,jsonb) from anon, authenticated;
+grant execute on function public.conference_create(text,text,text) to service_role;
+grant execute on function public.conference_read(text) to service_role;
+grant execute on function public.conference_update(text,text,integer,text,jsonb) to service_role;
 

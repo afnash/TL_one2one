@@ -2,6 +2,7 @@
 
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
+import { EmptyNote, PageHeader } from "@/components/dashboard/parts";
 import { SessionReportDetails } from "@/components/session/SessionReportDetails";
 
 export default function ManagerReportsPage() {
@@ -22,33 +23,13 @@ export default function ManagerReportsPage() {
   );
 
   return (
-    <AppShell
-      headerTitle="Department Reports"
-      headerSubtitle="Session logs, academic evaluations, and student progress reports"
-    >
-      <div className="mx-auto max-w-7xl space-y-6 pb-16">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Session Reports</h1>
-            <p className="text-xs text-slate-500">
-              Review completed teaching logs and student evaluations from your department.
-            </p>
-          </div>
-          <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 rounded-xl text-slate-700">
-            {teamReports.length} reports
-          </span>
-        </div>
-
-        {[...teamReports]
-          .sort((a, b) => b.date.localeCompare(a.date))
-          .map((report) => (
-            <SessionReportDetails key={report.id} report={report} />
-          ))}
-
-        {!teamReports.length && (
-          <div className="p-12 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-            No session reports filed by your department faculty yet.
-          </div>
+    <AppShell headerTitle="Reports">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-16">
+        <PageHeader title="Reports" description="Lesson reports written by your teachers, newest first." />
+        {teamReports.length ? (
+          [...teamReports].sort((a, b) => b.date.localeCompare(a.date)).map((report) => <SessionReportDetails key={report.id} report={report} />)
+        ) : (
+          <EmptyNote>No session reports from your teachers yet.</EmptyNote>
         )}
       </div>
     </AppShell>

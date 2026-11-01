@@ -1,7 +1,7 @@
 "use client";
 
 import { useRemoteCollection } from "./remote-collection";
-import { supabaseRequest } from "./supabase";
+import { apiRequest } from "./supabase";
 import { studentTimetable } from "./session-report";
 import React, {
   createContext,
@@ -32,9 +32,11 @@ import {
 interface LMSContextType {
   role: UserRole;
   directory: { teachers: Teacher[]; students: Student[]; managers: Manager[] };
-  login: (role: "STUDENT" | "TEACHER" | "MANAGER", id: string) => Promise<void>;
   loginWithCredentials: (email: string, password: string) => Promise<{ role: UserRole; redirect: string; user: any }>;
-  updateCredentials: (role: UserRole, id: string, email: string, password?: string) => void;
+  refreshSession: () => Promise<void>;
+  logout: () => Promise<void>;
+  /** Resolves once the server accepted the change; rejects with the server's message. */
+  updateCredentials: (role: UserRole, id: string, email: string, password?: string) => Promise<void>;
   createSession: (data: Omit<Session, "id">) => Session;
   updateSession: (id: string, changes: Partial<Session>) => void;
   deleteAssignment: (id: string) => void;
@@ -99,6 +101,7 @@ interface LMSContextType {
   deleteManager: (id: string) => void;
   
   // Notifications & Global Search
+  waitForSaves: () => Promise<void>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   isCommandPaletteOpen: boolean;
@@ -106,8 +109,6 @@ interface LMSContextType {
 }
 
 const LMSContext = createContext<LMSContextType | undefined>(undefined);
-
-const STORAGE_KEY = "onetoone_identity";
 
 const EMPTY_USERS: Record<UserRole, User> = {
   TEACHER: { id: "", name: "Teacher", email: "", avatar: "/icon.jpg", role: "TEACHER" },
@@ -118,113 +119,63 @@ const EMPTY_USERS: Record<UserRole, User> = {
 
 export function LMSProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>("TEACHER");
-  const [teachers, setTeachers, teachersSync] = useRemoteCollection<Teacher>("lms_teachers");
-  const [students, setStudents, studentsSync] = useRemoteCollection<Student>("lms_students");
-  const [managers, setManagers, managersSync] = useRemoteCollection<Manager>("lms_managers");
-  const [subjects, setSubjects, subjectsSync] = useRemoteCollection<Subject>("lms_subjects");
-  const [sessions, setSessions, sessionsSync] = useRemoteCollection<Session>("lms_sessions");
-  const [whiteboards, setWhiteboards, whiteboardsSync] = useRemoteCollection<Whiteboard>("lms_whiteboards");
-  const [assignments, setAssignments, assignmentsSync] = useRemoteCollection<Assignment>("lms_assignments");
-  const [submissions, setSubmissions, submissionsSync] = useRemoteCollection<Submission>("lms_submissions");
-  const [materials, setMaterials, materialsSync] = useRemoteCollection<StudyMaterial>("lms_materials");
-  const [sessionReports, setSessionReports, sessionReportsSync] = useRemoteCollection<SessionReport>("lms_sessionreports");
-  const [notifications, setNotifications, notificationsSync] = useRemoteCollection<Notification>("lms_notifications");
+  const [identityId, setIdentityId] = useState("");
   const [hasHydrated, setHasHydrated] = useState(false);
+  const signedIn = Boolean(identityId);
+  const [teachers, setTeachers, teachersSync] = useRemoteCollection<Teacher>("lms_teachers", signedIn, 10000);
+  const [students, setStudents, studentsSync] = useRemoteCollection<Student>("lms_students", signedIn, 10000);
+  const [managers, setManagers, managersSync] = useRemoteCollection<Manager>("lms_managers", signedIn, 15000);
+  const [subjects, setSubjects, subjectsSync] = useRemoteCollection<Subject>("lms_subjects", signedIn, 15000);
+  const [sessions, setSessions, sessionsSync] = useRemoteCollection<Session>("lms_sessions", signedIn, 2500);
+  const [whiteboards, setWhiteboards, whiteboardsSync] = useRemoteCollection<Whiteboard>("lms_whiteboards", signedIn, 2000);
+  const [assignments, setAssignments, assignmentsSync] = useRemoteCollection<Assignment>("lms_assignments", signedIn, 8000);
+  const [submissions, setSubmissions, submissionsSync] = useRemoteCollection<Submission>("lms_submissions", signedIn, 6000);
+  const [materials, setMaterials, materialsSync] = useRemoteCollection<StudyMaterial>("lms_materials", signedIn, 10000);
+  const [sessionReports, setSessionReports, sessionReportsSync] = useRemoteCollection<SessionReport>("lms_sessionreports", signedIn, 10000);
+  const [notifications, setNotifications, notificationsSync] = useRemoteCollection<Notification>("lms_notifications", signedIn, 6000);
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
 
-  const [identityId, setIdentityId] = useState("");
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) { try { const identity = JSON.parse(stored); setRole(identity.role); setIdentityId(identity.id); } catch { localStorage.removeItem(STORAGE_KEY); } }
+  // Identity comes from the signed httpOnly session cookie, not browser storage.
+  const refreshSession = useCallback(async () => {
+    // Only an explicit "no session" answer signs the user out. A slow or failed request
+    // (network blip, database latency) is retried first, so a hiccup never bounces a
+    // signed-in user to the login page.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { session } = await apiRequest<{ session: { role: UserRole; id: string } | null }>("/api/auth/session");
+        if (session) { setRole(session.role); setIdentityId(session.id); } else setIdentityId("");
+        setHasHydrated(true);
+        return;
+      } catch {
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+      }
+    }
+    // Still failing: treated as signed out; the role layouts redirect to sign-in.
     setHasHydrated(true);
   }, []);
+  useEffect(() => {
+    localStorage.removeItem("onetoone_identity");
+    void refreshSession();
+  }, [refreshSession]);
 
-  const login = async (selectedRole: "STUDENT" | "TEACHER" | "MANAGER", id: string) => {
-    const person = selectedRole === "TEACHER" 
-      ? teachers.find(p => p.id === id) 
-      : selectedRole === "MANAGER"
-        ? managers.find(p => p.id === id)
-        : students.find(p => p.id === id);
-    if (!person) throw new Error("Choose an existing profile or ask an administrator to create one.");
-    await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ id, data: { id, role: selectedRole, name: person.name, lastLoginAt: new Date().toISOString() } }) });
-    setRole(selectedRole); setIdentityId(id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: selectedRole, id }));
+  const logout = async () => {
+    try { await apiRequest("/api/auth/session", { method: "DELETE" }); } catch { /* cookie expires anyway */ }
+    setIdentityId("");
   };
 
   const loginWithCredentials = async (emailInput: string, passwordInput: string) => {
-    const cleanEmail = (emailInput || "").trim().toLowerCase();
-    const cleanPass = (passwordInput || "").trim();
-
-    if (!cleanEmail) throw new Error("Please enter your email address.");
-    if (!cleanPass) throw new Error("Please enter your password.");
-
-    // 1. Super Admin Check
-    const adminEmails = ["admin@test.com", "admin@onetoone.com", "superadmin@onetoone.com", "admin", "admin@sofia.edu"];
-    if (adminEmails.includes(cleanEmail) && (cleanPass === "admin123" || cleanPass === "admin" || cleanPass === "password123")) {
-      setRole("SUPERADMIN");
-      setIdentityId("admin-1");
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "SUPERADMIN", id: "admin-1" }));
-      return { role: "SUPERADMIN" as UserRole, redirect: "/admin/dashboard", user: EMPTY_USERS.SUPERADMIN };
-    }
-
-    // 2. Manager Check
-    const matchedManager = managers.find(m => 
-      m.email?.toLowerCase() === cleanEmail && 
-      ((m.password && m.password === cleanPass) || (!m.password && (cleanPass === "password123" || cleanPass === "123456" || cleanPass === "admin123")))
-    );
-    if (matchedManager) {
-      if (matchedManager.status === "inactive") throw new Error("This manager account is marked inactive. Contact Super Admin.");
-      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates" },
-        body: JSON.stringify({ id: matchedManager.id, data: { id: matchedManager.id, role: "MANAGER", name: matchedManager.name, lastLoginAt: new Date().toISOString() } })
-      });
-      setRole("MANAGER");
-      setIdentityId(matchedManager.id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "MANAGER", id: matchedManager.id }));
-      return { role: "MANAGER" as UserRole, redirect: "/manager/dashboard", user: matchedManager };
-    }
-
-    // 3. Teacher Check
-    const matchedTeacher = teachers.find(t => 
-      t.email?.toLowerCase() === cleanEmail && 
-      ((t.password && t.password === cleanPass) || (!t.password && (cleanPass === "password123" || cleanPass === "123456")))
-    );
-    if (matchedTeacher) {
-      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates" },
-        body: JSON.stringify({ id: matchedTeacher.id, data: { id: matchedTeacher.id, role: "TEACHER", name: matchedTeacher.name, lastLoginAt: new Date().toISOString() } })
-      });
-      setRole("TEACHER");
-      setIdentityId(matchedTeacher.id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "TEACHER", id: matchedTeacher.id }));
-      return { role: "TEACHER" as UserRole, redirect: "/teacher/dashboard", user: matchedTeacher };
-    }
-
-    // 4. Student Check
-    const matchedStudent = students.find(s => 
-      s.email?.toLowerCase() === cleanEmail && 
-      ((s.password && s.password === cleanPass) || (!s.password && (cleanPass === "password123" || cleanPass === "123456")))
-    );
-    if (matchedStudent) {
-      if (matchedStudent.status === "inactive") throw new Error("This student account is inactive. Contact your administrator.");
-      await supabaseRequest("/rest/v1/lms_profiles?on_conflict=id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates" },
-        body: JSON.stringify({ id: matchedStudent.id, data: { id: matchedStudent.id, role: "STUDENT", name: matchedStudent.name, lastLoginAt: new Date().toISOString() } })
-      });
-      setRole("STUDENT");
-      setIdentityId(matchedStudent.id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ role: "STUDENT", id: matchedStudent.id }));
-      return { role: "STUDENT" as UserRole, redirect: "/student/dashboard", user: matchedStudent };
-    }
-
-    throw new Error("Invalid email or password. Please verify your credentials.");
+    const email = (emailInput || "").trim().toLowerCase();
+    const password = passwordInput || "";
+    if (!email) throw new Error("Please enter your email address.");
+    if (!password) throw new Error("Please enter your password.");
+    const result = await apiRequest<{ role: UserRole; id: string; redirect: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    setRole(result.role);
+    setIdentityId(result.id);
+    return { role: result.role, redirect: result.redirect, user: undefined };
   };
 
   const syncStates = [teachersSync, studentsSync, managersSync, subjectsSync, sessionsSync, whiteboardsSync, assignmentsSync, submissionsSync, materialsSync, sessionReportsSync, notificationsSync];
@@ -415,11 +366,10 @@ export function LMSProvider({ children }: { children: ReactNode }) {
 
   const createAssignment = (assignmentData: Omit<Assignment, "id" | "createdAt">): Assignment => {
     const newId = crypto.randomUUID();
-    const teacherStudents = students.filter(s => s.teacherId === user.id);
-    const broadcastList = teacherStudents.length > 0 ? teacherStudents.map(s => s.id) : students.map(s => s.id);
+    // Broadcast reaches only this teacher's own students; never fall back to other rosters.
     const assignedStudentIds = assignmentData.targetType === "BROADCAST"
-      ? broadcastList
-      : (assignmentData.assignedStudentIds && assignmentData.assignedStudentIds.length > 0 ? assignmentData.assignedStudentIds : (students[0] ? [students[0].id] : []));
+      ? students.filter(s => s.teacherId === user.id).map(s => s.id)
+      : assignmentData.assignedStudentIds || [];
 
     const newAssignment: Assignment = {
       ...assignmentData,
@@ -434,12 +384,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
 
     // Send notification to assigned students
     const notifs: Notification[] = assignedStudentIds.map((sId) => ({
-      id: `notif-${Date.now()}-${sId}`,
+      id: crypto.randomUUID(),
       userId: sId,
       targetRole: "STUDENT",
       title: "New Assignment Assigned",
       message: `${user.name || "Teacher"} posted '${newAssignment.title}' (${newAssignment.subject}). Due: ${newAssignment.dueDate}`,
-      timestamp: "Just now",
+      timestamp: new Date().toISOString(),
       read: false,
       type: "assignment",
       link: "/student/assignments",
@@ -494,14 +444,14 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     }
 
     // Notify teacher
-    setNotifications((prev) => [
+    if (asg.teacherId) setNotifications((prev) => [
       {
-        id: `notif-${Date.now()}`,
-          userId: asg?.teacherId || "",
+        id: crypto.randomUUID(),
+        userId: asg.teacherId,
         targetRole: "TEACHER",
         title: "Assignment Submitted",
         message: `${stud.name} submitted '${asg?.title}'. Ready for review.`,
-        timestamp: "Just now",
+        timestamp: new Date().toISOString(),
         read: false,
         type: "assignment",
         link: "/teacher/assignments",
@@ -538,12 +488,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     if (sub) {
       setNotifications((prev) => [
         {
-          id: `notif-${Date.now()}`,
+          id: crypto.randomUUID(),
           userId: sub.studentId,
           targetRole: "STUDENT",
           title: "Assignment Graded & Feedback",
           message: `${user.name} graded '${sub.assignmentTitle}'. Score: ${score}/${sub.maxScore}`,
-          timestamp: "Just now",
+          timestamp: new Date().toISOString(),
           read: false,
           type: "assignment",
           link: "/student/assignments",
@@ -668,6 +618,12 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     setManagers((prev) => prev.filter((m) => m.id !== id));
   };
 
+  const waitForSaves = async () => {
+    const results = await Promise.allSettled([teachersSync, studentsSync, managersSync, subjectsSync, sessionsSync, whiteboardsSync, assignmentsSync, submissionsSync, materialsSync, sessionReportsSync, notificationsSync].map(sync => sync.waitForSave()));
+    const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failed) throw failed.reason;
+  };
+
   const markNotificationRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
@@ -725,23 +681,20 @@ export function LMSProvider({ children }: { children: ReactNode }) {
 
   const subjectNames = Array.from(new Set([...teachers.flatMap(t => t.subjects), ...students.flatMap(s => s.subjects)])).filter(Boolean);
 
-  const updateCredentials = (targetRole: UserRole, id: string, newEmail: string, newPassword?: string) => {
+  const updateCredentials = async (targetRole: UserRole, id: string, newEmail: string, newPassword?: string) => {
     const cleanEmail = (newEmail || "").trim();
-    const cleanPass = (newPassword || "").trim();
-    if (!cleanEmail) return;
+    const cleanPass = newPassword || "";
+    if (!cleanEmail) throw new Error("Email is required.");
 
     if (targetRole === "MANAGER") {
-      const updates: Partial<Manager> = { email: cleanEmail };
-      if (cleanPass) updates.password = cleanPass;
-      updateManager(id, updates);
+      updateManager(id, cleanPass ? { email: cleanEmail, password: cleanPass } : { email: cleanEmail });
+      await managersSync.waitForSave();
     } else if (targetRole === "TEACHER") {
-      const updates: Partial<Teacher> = { email: cleanEmail };
-      if (cleanPass) updates.password = cleanPass;
-      updateTeacher(id, updates);
+      updateTeacher(id, cleanPass ? { email: cleanEmail, password: cleanPass } : { email: cleanEmail });
+      await teachersSync.waitForSave();
     } else if (targetRole === "STUDENT") {
-      const updates: Partial<Student> = { email: cleanEmail };
-      if (cleanPass) updates.password = cleanPass;
-      updateStudent(id, updates);
+      updateStudent(id, cleanPass ? { email: cleanEmail, password: cleanPass } : { email: cleanEmail });
+      await studentsSync.waitForSave();
     }
   };
 
@@ -749,9 +702,9 @@ export function LMSProvider({ children }: { children: ReactNode }) {
     <LMSContext.Provider
       value={{
         directory: { teachers, students, managers },
-        role, user, switchRole, login, loginWithCredentials, updateCredentials, loading, saving, connectionError, createSession, updateSession, deleteAssignment,
+        role, user, switchRole, loginWithCredentials, refreshSession, logout, updateCredentials, loading, saving, connectionError, createSession, updateSession, deleteAssignment,
         teachers: teachers.map(t => ({ ...t, totalStudents: students.filter(s => s.teacherId === t.id).length, totalSessions: sessions.filter(s => s.teacherId === t.id && s.status === "COMPLETED").length })),
-        students: role === "TEACHER" ? (myStudents.length > 0 ? myStudents : students) : role === "MANAGER" ? managedStudents : role === "STUDENT" ? students.filter(s => s.id === user.id) : students,
+        students: role === "TEACHER" ? myStudents : role === "MANAGER" ? managedStudents : role === "STUDENT" ? students.filter(s => s.id === user.id) : students,
         managers,
         subjects: subjects.length ? subjects : subjectNames.map(name => ({ id: name, name, code: name.slice(0, 3), color: "#6366f1", icon: "book", description: "", studentCount: students.filter(s => s.subjects.includes(name)).length, topics: [] })),
         sessions: sessions.filter(sessionVisible),
@@ -791,6 +744,7 @@ export function LMSProvider({ children }: { children: ReactNode }) {
         addManager,
         updateManager,
         deleteManager,
+        waitForSaves,
         markNotificationRead,
         markAllNotificationsRead,
         isCommandPaletteOpen,

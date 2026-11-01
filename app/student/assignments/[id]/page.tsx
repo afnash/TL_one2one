@@ -5,16 +5,9 @@ import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import confetti from "canvas-confetti";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Send,
-  Calendar,
-  Layers,
-  BookOpen,
-  Sparkles,
-  Award,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -31,7 +24,7 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
   const assignment = assignments.find((a) => a.id === assignmentId);
   const submission = submissions.find((s) => s.assignmentId === assignmentId && s.studentId === user.id);
 
-  const [activeWhiteboardId, setActiveWhiteboardId] = useState<string>(
+  const [activeWhiteboardId] = useState<string>(
     submission?.whiteboardId || `work-${assignmentId}-${user.id}`
   );
   const [isSubmitted, setIsSubmitted] = useState<boolean>(
@@ -45,155 +38,116 @@ export default function StudentAssignmentWorkspacePage({ params }: PageProps) {
   useEffect(() => {
     if (assignment && !currentBoard) {
       const template = whiteboards.find(w=>w.id===assignment.whiteboardId);
-      saveWhiteboard({ id: activeWhiteboardId, title: assignment.title + " ? " + user.name, subject: assignment.subject, studentId: user.id, studentName: user.name, teacherId: assignment.teacherId, assignmentId: assignment.id, category: "ASSIGNMENT_SUBMISSION", elements: template?.elements || [], lastEdited: new Date().toISOString() });
+      saveWhiteboard({ id: activeWhiteboardId, title: assignment.title + " · " + user.name, subject: assignment.subject, studentId: user.id, studentName: user.name, teacherId: assignment.teacherId, assignmentId: assignment.id, category: "ASSIGNMENT_SUBMISSION", elements: template?.elements || [], lastEdited: new Date().toISOString() });
     }
   }, [assignment?.id, currentBoard?.id]);
 
   const handleSubmit = () => {
     if(!assignment || !currentBoard) return;
-    // Launch celebratory confetti
+    try {
+      submitAssignment(assignment.id, user.id, activeWhiteboardId);
+    } catch {
+      return;
+    }
+    setIsSubmitted(true);
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
     });
-
-    submitAssignment(assignment.id, user.id, activeWhiteboardId);
-    setIsSubmitted(true);
   };
 
-  if (!assignment) return <div className="p-10">Assignment not found.</div>;
+  if (!assignment) return <div className="p-10 text-muted-foreground">Assignment not found.</div>;
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900 overflow-hidden font-sans select-none">
-      {/* Non-Video Assignment Workspace Header */}
-      <header className="h-14 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/student/assignments")}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xs font-bold text-slate-900">{assignment.title}</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
-                {assignment.subject}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Instructor: <strong>{assignment.teacherName}</strong> • Due: {assignment.dueDate}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card px-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/student/assignments")} aria-label="Back to assignments">
+            <ArrowLeft />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold leading-tight text-foreground">{assignment.title}</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              {assignment.subject} · {assignment.teacherName} · Due {assignment.dueDate}
             </p>
           </div>
         </div>
 
-        {/* Right Status & Submit Button */}
-        <div className="flex items-center gap-2">
-          {submission?.status === "REVIEWED" ? (
-            <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl">
-              <Award className="w-4 h-4 text-emerald-600" />
-              <span>Score: {submission.score} / {submission.maxScore} (Reviewed)</span>
-            </div>
-          ) : isSubmitted ? (
-            <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold rounded-xl">
-              <CheckCircle2 className="w-4 h-4 text-amber-600" />
-              <span>Submitted • Awaiting Teacher Review</span>
-            </div>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Submit Assignment</span>
-            </button>
-          )}
-        </div>
+        {submission?.status === "REVIEWED" ? (
+          <p className="text-sm font-medium text-foreground">
+            Scored {submission.score} of {submission.maxScore}
+          </p>
+        ) : isSubmitted ? (
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4" />
+            Submitted, waiting for review
+          </p>
+        ) : (
+          <Button onClick={handleSubmit}>
+            <Send data-icon="inline-start" />
+            Submit assignment
+          </Button>
+        )}
       </header>
 
-      {/* Main Workspace Layout */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className="grid grid-cols-2 gap-1 border-b border-slate-200 bg-white p-2 lg:hidden">
-          <button
-            onClick={() => setMobileTab("QUESTIONS")}
-            className={cn("rounded-lg px-3 py-2 text-xs font-bold", mobileTab === "QUESTIONS" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600")}
-          >
-            Questions
-          </button>
-          <button
-            onClick={() => setMobileTab("WORK")}
-            className={cn("rounded-lg px-3 py-2 text-xs font-bold", mobileTab === "WORK" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600")}
-          >
-            My Work
-          </button>
-        </div>
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+        <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as "QUESTIONS" | "WORK")} className="border-b bg-card p-2 lg:hidden">
+          <TabsList className="w-full">
+            <TabsTrigger value="QUESTIONS">Questions</TabsTrigger>
+            <TabsTrigger value="WORK">My work</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {mobileTab === "QUESTIONS" && (
-          <div className="flex-1 space-y-3 overflow-y-auto bg-white p-4 lg:hidden">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-card p-4 lg:hidden">
             {assignment.questions.map((question) => (
-              <article key={question.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-2 flex items-center justify-between text-xs font-bold text-indigo-700">
-                  <span>Question {question.number}</span><span>{question.maxScore} marks</span>
+              <article key={question.id} className="rounded-xl border bg-background p-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>Question {question.number}</span>
+                  <span>{question.maxScore} marks</span>
                 </div>
-                <p className="text-sm leading-6 text-slate-800">{question.text}</p>
+                <p className="text-sm leading-6 text-foreground">{question.text}</p>
               </article>
             ))}
           </div>
         )}
-        {/* Left: Questions Navigator Bar */}
-        <div className="hidden lg:flex w-80 bg-white border-r border-slate-200 flex-col p-4 space-y-4 shrink-0 overflow-y-auto">
-          <div className="space-y-1">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Problems to Solve ({assignment.questions.length})
-            </h3>
-            <p className="text-xs text-slate-500">
-              Solve each problem directly on the whiteboard canvas.
-            </p>
+
+        <aside className="hidden w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r bg-card p-4 lg:flex">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-medium text-foreground">Questions ({assignment.questions.length})</h2>
+            <p className="text-xs text-muted-foreground">Solve each one directly on the whiteboard.</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {assignment.questions.map((q) => (
-              <div
-                key={q.id}
-                className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-indigo-600">Question {q.number}</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 bg-white border border-slate-200 rounded-md text-slate-700">
-                    {q.maxScore} marks
-                  </span>
+              <div key={q.id} className="flex flex-col gap-2 rounded-xl border bg-background p-3.5 text-sm">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Question {q.number}</span>
+                  <span>{q.maxScore} marks</span>
                 </div>
-                <p className="text-slate-800 font-medium leading-relaxed">{q.text}</p>
+                <p className="leading-relaxed text-foreground">{q.text}</p>
               </div>
             ))}
           </div>
 
           {submission?.teacherFeedback && (
-            <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2 text-xs">
-              <span className="font-bold text-indigo-950 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Educator Comments
-              </span>
-              <p className="text-indigo-900 italic leading-relaxed">
-                "{submission.teacherFeedback}"
-              </p>
+            <div className="flex flex-col gap-1.5 rounded-xl border bg-secondary/50 p-4 text-sm">
+              <h3 className="text-xs font-medium text-muted-foreground">Teacher feedback</h3>
+              <p className="leading-relaxed text-foreground">{submission.teacherFeedback}</p>
             </div>
           )}
-        </div>
+        </aside>
 
-        {/* Center: Student Interactive Solution Whiteboard */}
-        <div className={cn("flex-1 flex-col bg-white overflow-hidden relative", mobileTab === "WORK" ? "flex" : "hidden lg:flex")}>
-          <div className="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600 shrink-0">
-            <span className="font-semibold flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-indigo-600" />
-              Solution Scratchpad: <strong>{currentBoard?.title || "My Assignment Canvas"}</strong>
+        <div className={cn("relative flex-1 flex-col overflow-hidden bg-card", mobileTab === "WORK" ? "flex" : "hidden lg:flex")}>
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <span className="truncate">
+              Working on <span className="font-medium text-foreground">{currentBoard?.title || "My assignment board"}</span>
             </span>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              Canvas automatically saved. Use Pen, Shapes, Text & Export tools.
-            </span>
+            <span className="hidden sm:inline">Saved automatically</span>
           </div>
 
-          <div className="flex-1 w-full h-full relative">
+          <div className="relative h-full w-full flex-1">
             <WhiteboardCanvas
               initialWhiteboard={currentBoard}
               whiteboardId={currentBoard?.id}

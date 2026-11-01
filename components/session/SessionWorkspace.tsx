@@ -4,17 +4,30 @@ import { useState, type ReactNode } from "react";
 import { useLMS } from "@/lib/store";
 import { isComputerScience } from "@/lib/coding";
 import type { Session } from "@/types";
+import { Button } from "@/components/ui/button";
 import { CodingWorkspace } from "./CodingWorkspace";
 
 export function SessionWorkspace({ session, children }: { session: Session; children: ReactNode }) {
   const { subjects } = useLMS();
   const [tab, setTab] = useState("whiteboard");
   const cs = isComputerScience(session.subject, subjects);
-  return <div className="flex h-full min-h-0 flex-col">
-    {cs && <div className="flex shrink-0 gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2" aria-label="Class workspace">
-      {[["whiteboard", "Whiteboard"], ["coding", "Live coding"]].map(([value, label]) => <button key={value} aria-pressed={tab === value} onClick={() => setTab(value)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === value ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-200"}`}>{label}</button>)}
-    </div>}
-    <div className={`${cs && tab === "coding" ? "hidden" : "flex-1 min-h-0 relative"}`}>{children}</div>
-    {cs && <div className={tab === "coding" ? "flex-1 min-h-0 flex flex-col h-full" : "hidden"}><CodingWorkspace key={session.id} session={session} /></div>}
-  </div>;
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {cs && (
+        <div className="flex shrink-0 gap-1 border-b bg-muted/40 px-3 py-1.5" role="tablist" aria-label="Lesson workspace">
+          {[["whiteboard", "Whiteboard"], ["coding", "Live coding"]].map(([value, label]) => (
+            <Button key={value} size="sm" role="tab" aria-selected={tab === value} variant={tab === value ? "secondary" : "ghost"} onClick={() => setTab(value)}>
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
+      <div className={cs && tab === "coding" ? "hidden" : "relative min-h-0 flex-1"}>{children}</div>
+      {cs && (
+        <div className={tab === "coding" ? "flex h-full min-h-0 flex-1 flex-col" : "hidden"}>
+          <CodingWorkspace key={session.id} session={session} />
+        </div>
+      )}
+    </div>
+  );
 }

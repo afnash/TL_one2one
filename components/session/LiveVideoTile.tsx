@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Mic, MicOff, Video as VideoIcon, VideoOff, AlertCircle } from "lucide-react";
+import { MicOff, VideoOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LiveVideoTileProps {
@@ -170,152 +170,84 @@ export function LiveVideoTile({
   }, [activeMedia, isCameraOn]);
 
   // Format short name for compact mode
+
   const shortName = isLocalUser ? "You" : participantName.split(" ")[0];
+  const showVideo = isCameraOn && !hasPermissionError;
+  const initials = participantName
+    .replace(/\(You\)/, "")
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div
       className={cn(
-        "relative aspect-video bg-slate-900 rounded-2xl overflow-hidden border border-white/10 shadow-lg group select-none transition-all",
-        compact && "rounded-xl border-white/15 shadow-md",
+        "relative aspect-video select-none overflow-hidden rounded-xl border bg-muted",
         className
       )}
     >
-      {/* Real Video Element */}
-      {isCameraOn && !hasPermissionError ? (
+      {showVideo ? (
         <video
           ref={handleVideoRef}
           autoPlay
           playsInline
-          muted={isLocalUser} // Mute self to prevent feedback loop
-          className={cn(
-            "w-full h-full object-cover",
-            isLocalUser && "transform -scale-x-100" // Mirror only local webcam
-          )}
+          muted={isLocalUser}
+          className={cn("size-full object-cover", isLocalUser && "-scale-x-100")}
         />
       ) : (
-        /* Fallback Avatar */
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-slate-300 p-2 text-center">
+        <div className="flex size-full flex-col items-center justify-center gap-1 p-2 text-center text-muted-foreground">
           {fallbackAvatar ? (
-            <div
-              className={cn(
-                "relative rounded-full overflow-hidden border-2 border-indigo-500/40 shadow-lg",
-                compact ? "w-9 h-9" : "w-14 h-14 mb-1.5"
-              )}
-            >
-              <img src={fallbackAvatar} alt={participantName} className="w-full h-full object-cover" />
-            </div>
+            <img
+              src={fallbackAvatar}
+              alt={participantName}
+              className={cn("rounded-full border object-cover", compact ? "size-9" : "size-14")}
+            />
           ) : (
             <div
               className={cn(
-                "rounded-full bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-white font-bold",
-                compact ? "w-8 h-8 text-xs" : "w-12 h-12 text-base mb-1.5"
+                "flex items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground",
+                compact ? "size-8 text-xs" : "size-12 text-base"
               )}
             >
-              {participantName.split(" ").map((n) => n[0]).join("")}
+              {initials}
             </div>
           )}
-
           {!compact && (
             <>
-              <p className="text-xs font-semibold text-slate-200 truncate max-w-[160px]">{participantName}</p>
-              <span className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                <VideoOff className="w-3 h-3 text-slate-500" />
-                {hasPermissionError ? "Camera Permission Needed" : "Camera Off"}
+              <p className="max-w-[160px] truncate text-xs font-medium text-foreground">{participantName}</p>
+              <span className="flex items-center gap-1 text-[11px]">
+                <VideoOff className="size-3" />
+                {hasPermissionError ? "Camera permission needed" : "Camera off"}
               </span>
             </>
           )}
         </div>
       )}
 
-      {/* COMPACT / FLOATING OVERLAY */}
-      {compact ? (
-        <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex items-center justify-between text-white pointer-events-none">
-          {/* Name & Role */}
-          <div className="flex items-center gap-1 truncate max-w-[80%]">
-            <span className="text-[11px] font-bold text-white tracking-tight truncate drop-shadow-sm">
-              {shortName}
-            </span>
+      {/* Name + mic strip sits on the video, so it stays dark for legibility. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-2 text-white">
+        <span className="truncate text-xs font-medium">
+          {compact ? shortName : participantName}
+          <span className="ml-1 text-white/70">· {roleLabel}</span>
+        </span>
+        {isMicOn ? (
+          <span className="flex h-4 items-end gap-0.5" aria-label="Microphone on">
             <span
-              className={cn(
-                "text-[8px] px-1 py-0.2 rounded font-extrabold uppercase shrink-0",
-                roleLabel === "Teacher"
-                  ? "bg-indigo-500/80 text-white"
-                  : "bg-emerald-500/80 text-white"
-              )}
-            >
-              {roleLabel[0]}
-            </span>
-          </div>
-
-          {/* Audio Indicator */}
-          <div className="flex items-center gap-1 shrink-0">
-            {isMicOn ? (
-              <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-black/40 backdrop-blur-xs">
-                <div
-                  className="w-1 h-2 bg-emerald-400 rounded-full transition-all duration-75"
-                  style={{ transform: `scaleY(${Math.max(0.4, audioLevel / 35)})` }}
-                />
-                <div
-                  className="w-1 h-3 bg-emerald-400 rounded-full transition-all duration-75"
-                  style={{ transform: `scaleY(${Math.max(0.3, audioLevel / 25)})` }}
-                />
-              </div>
-            ) : (
-              <div className="p-0.5 rounded bg-rose-600/90 text-white">
-                <MicOff className="w-2.5 h-2.5" />
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* DOCKED SIDEBAR OVERLAY */
-        <>
-          {/* Top Header Badge */}
-          <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 backdrop-blur-md rounded-lg text-[10px] font-bold text-white flex items-center gap-1.5 border border-white/10 shadow-sm">
-            <span className="truncate max-w-[100px]">{participantName}</span>
+              className="h-2 w-0.5 origin-bottom rounded-full bg-white transition-transform duration-75"
+              style={{ transform: `scaleY(${Math.max(0.4, audioLevel / 35)})` }}
+            />
             <span
-              className={cn(
-                "text-[8px] px-1 py-0.2 rounded font-extrabold uppercase",
-                roleLabel === "Teacher"
-                  ? "bg-indigo-500/40 text-indigo-300 border border-indigo-500/40"
-                  : "bg-emerald-500/40 text-emerald-300 border border-emerald-500/40"
-              )}
-            >
-              {roleLabel}
-            </span>
-          </div>
-
-          {/* Top Right Status */}
-          <div className="absolute top-2 right-2 flex items-center gap-1">
-            {!isMicOn && (
-              <div className="p-1 rounded-md bg-rose-600/90 text-white shadow-sm" title="Microphone muted">
-                <MicOff className="w-2.5 h-2.5" />
-              </div>
-            )}
-            {isCameraOn && !hasPermissionError && (
-              <div className="px-1.5 py-0.5 bg-slate-950/80 backdrop-blur-md border border-white/10 rounded-md text-[9px] font-semibold text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live</span>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Audio Visualizer Bar */}
-          {isMicOn && (
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-slate-950/80 backdrop-blur-md px-1.5 py-0.5 rounded-md border border-white/10">
-              <div
-                className="w-1 h-2 bg-emerald-400 rounded-full transition-all duration-75"
-                style={{ transform: `scaleY(${Math.max(0.4, audioLevel / 35)})` }}
-              />
-              <div
-                className="w-1 h-3 bg-emerald-400 rounded-full transition-all duration-75"
-                style={{ transform: `scaleY(${Math.max(0.3, audioLevel / 25)})` }}
-              />
-              <span className="text-[8px] text-emerald-300 font-bold ml-0.5">Audio</span>
-            </div>
-          )}
-        </>
-      )}
+              className="h-3 w-0.5 origin-bottom rounded-full bg-white transition-transform duration-75"
+              style={{ transform: `scaleY(${Math.max(0.3, audioLevel / 25)})` }}
+            />
+          </span>
+        ) : (
+          <MicOff className="size-3.5 shrink-0 text-red-400" aria-label="Microphone muted" />
+        )}
+      </div>
     </div>
   );
 }

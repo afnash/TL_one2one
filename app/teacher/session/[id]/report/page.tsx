@@ -13,10 +13,10 @@ export default function SessionReportPage({ params }: { params: Promise<{ id: st
     if (!loading && !connectionError) setReady(true);
   }, [loading, connectionError]);
   const session = sessions.find(s => s.id === id);
-  return <AppShell headerTitle="End Session Report" headerSubtitle="Record the lesson, student progress, and next steps">
+  return <AppShell headerTitle="Session report" headerSubtitle="Record the lesson, student progress and next steps">
     <div className="mx-auto max-w-5xl">
       {ready && (session ? <SessionReportForm key={session.id} session={session} existing={sessionReports.find(r => r.sessionId === id)} />
-        : <p className="p-8 text-slate-500">Session not found.</p>)}
+        : <p className="p-8 text-muted-foreground">Session not found.</p>)}
     </div>
   </AppShell>;
 }

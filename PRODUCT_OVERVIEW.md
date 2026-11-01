@@ -1,10 +1,10 @@
-# OneToOne LMS - Product Specification and Architectural Overview
+# sofiaa - Product Specification and Architectural Overview
 
 ## 1. Executive Summary
 
-OneToOne LMS is a specialized, real-time learning management and interactive tutoring platform engineered specifically for one-to-one and small-group live education.
+sofiaa is a specialized, real-time learning management and interactive tutoring platform engineered specifically for one-to-one and small-group live education.
 
-Unlike conventional enterprise learning management systems (LMS) that function primarily as asynchronous document repositories and submission portals, OneToOne LMS provides a live digital workspace. It brings high-definition video conferencing, a collaborative vector whiteboard, an integrated multi-language coding compiler, visual canvas-based assignment workflows, and structured post-session pedagogical reporting into a unified interface.
+Unlike conventional enterprise learning management systems (LMS) that function primarily as asynchronous document repositories and submission portals, sofiaa provides a live digital workspace. It brings high-definition video conferencing, a collaborative vector whiteboard, an integrated multi-language coding compiler, visual canvas-based assignment workflows, and structured post-session pedagogical reporting into a unified interface.
 
 ---
 
@@ -74,29 +74,29 @@ Unlike conventional enterprise learning management systems (LMS) that function p
 ### 3.8 Multi-Role Governance and Administration
 - Student Portal: Tailored dashboard displaying upcoming classes, active homework assignments, subject mastery metrics, and whiteboard history.
 - Teacher Studio: Educator workspace for roster management, student claims, lesson scheduling, assignment construction, and grading queues.
-- Admin Management Console (`/manage`, `/admin`): Centralized portal for user creation, teacher-student pairings, curriculum/subject configuration, and platform-wide audit logging.
+- Admin Management Console (`/manage`, `/admin`): Centralized portal for user creation, teacher-student pairings, and session reports across the platform.
 
 ---
 
-## 4. Key Value Drivers (Why OneToOne LMS is Prominent)
+## 4. Key Value Drivers (Why sofiaa is Prominent)
 
 1. Elimination of Tool Fragmentation:
-   Standard online tutoring relies on a disparate collection of tools (Zoom for video, Miro for whiteboards, Google Classroom for homework, and Replit for programming). OneToOne LMS unifies these workflows into a single interface, eliminating context switching and link sharing overhead.
+   Standard online tutoring relies on a disparate collection of tools (Zoom for video, Miro for whiteboards, Google Classroom for homework, and Replit for programming). sofiaa unifies these workflows into a single interface, eliminating context switching and link sharing overhead.
 
 2. Visual Step-by-Step Assessment:
    Subjects like Mathematics, Physics, Chemistry, and Engineering cannot be adequately evaluated through text fields or multiple-choice questions. The platform preserves handwritten derivations, diagrammatic proofs, and visual problem solving from assignment issuance through to grading.
 
 3. Low Friction Onboarding:
-   Fast profile selection and join-code conferences enable frictionless lesson starts without complex software downloads or multi-step account authentications during pilot stages.
+   Email sign-in and join-code conferences enable frictionless lesson starts without complex software downloads or multi-step account authentications during pilot stages.
 
 4. Built-In Educational Accountability:
    The platform links lesson scheduling, real-time classroom notes, recorded code, visual submissions, and structured post-session feedback into a continuous audit trail for educational institutions and parents.
 
 ---
 
-## 5. Comparative Analysis: OneToOne LMS vs Existing Solutions
+## 5. Comparative Analysis: sofiaa vs Existing Solutions
 
-| Dimension | Traditional LMS (Canvas, Moodle, Google Classroom) | Video Conferencing (Zoom, MS Teams, Google Meet) | Standalone Whiteboards (Miro, Mural) | OneToOne LMS |
+| Dimension | Traditional LMS (Canvas, Moodle, Google Classroom) | Video Conferencing (Zoom, MS Teams, Google Meet) | Standalone Whiteboards (Miro, Mural) | sofiaa |
 | :--- | :--- | :--- | :--- | :--- |
 | Primary Objective | Asynchronous course administration & file storage | Generic video and audio communication | Open-ended business brainstorming & diagrams | Live 1:1 and small-group interactive education |
 | Embedded Video Calling | No (requires external links) | Yes (core function) | No (requires third-party plugin) | Yes (integrated Jitsi video engine) |

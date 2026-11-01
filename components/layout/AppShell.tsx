@@ -8,7 +8,9 @@ import { RAGStudyChatbot } from "@/components/chat/RAGStudyChatbot";
 import { useLMS } from "@/lib/store";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 interface AppShellProps {
   children: ReactNode;
@@ -23,7 +25,7 @@ export function AppShell({
   headerSubtitle,
   hideSidebar = false,
 }: AppShellProps) {
-  const { loading, saving, connectionError, role, user, switchRole } = useLMS();
+  const { loading, saving, role, user, switchRole } = useLMS();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -33,6 +35,8 @@ export function AppShell({
     } else if (pathname.startsWith("/manager/")) {
       if (role !== "MANAGER" && role !== "SUPERADMIN") {
         switchRole("MANAGER");
+      } else if (!loading && role === "MANAGER" && !user.id) {
+        router.replace("/login");
       }
     } else if (!loading && (!user.id || !pathname.startsWith("/" + role.toLowerCase() + "/"))) {
       router.replace("/login");
@@ -42,62 +46,49 @@ export function AppShell({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-[#f8f9ff] text-[#0b1c30] overflow-hidden font-sans md:p-3.5 md:gap-5 lg:gap-6">
-      {/* Desktop Compressable Sidebar */}
+    <div className="flex h-screen w-full gap-4 overflow-hidden bg-background p-0 text-foreground md:p-3">
       {!hideSidebar && (
-        <div className="hidden md:flex h-full shrink-0 transition-all duration-300">
+        <div className="hidden h-full shrink-0 md:flex">
           <AppSidebar />
         </div>
       )}
 
-      {/* Mobile Drawer */}
-      {mobileDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-64 h-full bg-white shadow-2xl animate-in slide-in-from-left">
-            <button
-              onClick={() => setMobileDrawerOpen(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <AppSidebar onCloseMobile={() => setMobileDrawerOpen(false)} />
-          </div>
-          <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
-        </div>
-      )}
+      <Sheet open={mobileDrawerOpen} onOpenChange={setMobileDrawerOpen}>
+        <SheetContent side="left" className="w-64 gap-0 p-0 md:hidden" showCloseButton={false}>
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <AppSidebar onCloseMobile={() => setMobileDrawerOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col gap-4 min-w-0 h-full overflow-hidden">
+      <div className="flex h-full min-w-0 flex-1 flex-col gap-3 overflow-hidden">
         <AppHeader
           title={headerTitle}
           subtitle={headerSubtitle}
           onOpenMobileMenu={() => setMobileDrawerOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:px-0 md:py-6">
-          {connectionError && (
-            <div
-              role="alert"
-              className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-red-800 text-sm"
-            >
-              {connectionError}{" "}
-              <button onClick={() => window.location.reload()} className="underline">
-                Reload
-              </button>
-            </div>
-          )}
+        <main className="flex-1 overflow-y-auto px-3 pb-20 pt-2 md:px-1">
           {saving && (
-            <p role="status" className="text-xs text-indigo-600 mb-3">
-              Saving to Supabase...
+            <p role="status" className="pointer-events-none fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-md animate-in fade-in-0 duration-150">
+              <Spinner /> Saving changes…
             </p>
           )}
-          {loading ? <p className="p-8 text-slate-500">Loading workspace...</p> : children}
+          {loading ? (
+            <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading workspace">
+              <Skeleton className="h-8 w-56" />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+              </div>
+              <Skeleton className="h-64" />
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
 
-      {/* Global Command Palette */}
       <CommandPalette />
-
-      {/* Global RAG AI Study Chatbot */}
       <RAGStudyChatbot />
     </div>
   );

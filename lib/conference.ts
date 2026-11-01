@@ -1,5 +1,5 @@
 ﻿import type { Whiteboard } from "@/types";
-import { supabaseRequest } from "./supabase";
+import { apiRequest } from "./supabase";
 
 export interface Conference {
   code: string;
@@ -20,13 +20,13 @@ export function formatConferenceCode(value: string) {
 }
 export async function conferenceRPC<T>(name: "create" | "read" | "update", parameters: Record<string, unknown>) {
   try {
-    return await supabaseRequest<T>(`/rest/v1/rpc/conference_${name}`, {
+    return await apiRequest<T>(`/api/rpc/conference_${name}`, {
       method: "POST", body: JSON.stringify(parameters),
     });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Unable to connect to the conference.";
-    if (/schema cache|does not exist|could not find the function/i.test(message)) {
-      throw new Error("Conference setup is pending. Run supabase/migrations/20260910_conferences.sql in the Supabase SQL Editor, then retry.");
+    if (/setup is pending|schema cache|does not exist|could not find the function/i.test(message)) {
+      throw new Error("Conference setup is pending. Run supabase/schema.sql in the Supabase SQL Editor, then retry.");
     }
     throw new Error(message);
   }

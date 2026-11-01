@@ -8,7 +8,7 @@ const { PGlite } = loadRuntime(process.argv[2] || "@electric-sql/pglite");
  const db = new PGlite();
  try {
   await db.exec("create role anon; create role authenticated; create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); create table storage.objects(id text,bucket_id text,name text); alter table storage.objects enable row level security;");
-  const sql = fs.readFileSync("dumb.sql","utf8");
+  const sql = fs.readFileSync("supabase/schema.sql","utf8");
   await db.exec(sql); await db.exec(sql);
   const tables = await db.query("select tablename from pg_tables where schemaname='public' and tablename like 'lms_%'");
   assert.equal(tables.rows.length,11);

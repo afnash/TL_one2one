@@ -5,7 +5,7 @@ import { homeworkStatuses } from "@/lib/session-report";
 import { ReportTimetable } from "./ReportTimetable";
 
 function Detail({ label, value }: { label: string; value?: ReactNode }) {
-  return <div className="min-w-0"><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{value === undefined || value === null || value === "" ? "Not recorded" : value}</dd></div>;
+  return <div className="min-w-0"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">{value === undefined || value === null || value === "" ? "Not recorded" : value}</dd></div>;
 }
 
 function Contact({ label, person }: { label: string; person?: ReportContact }) {
@@ -13,23 +13,23 @@ function Contact({ label, person }: { label: string; person?: ReportContact }) {
 }
 
 export function SessionReportDetails({ report: r, editable = false }: { report: SessionReport; editable?: boolean }) {
-  return <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
+  return <article className="space-y-5 rounded-xl border bg-card p-5 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-lg font-bold text-slate-900">{r.topicTaught || "Session report"}</h2><p className="text-sm text-slate-600">{r.studentName} · {r.subject}</p></div>
+      <div><h2 className="text-lg font-semibold text-foreground">{r.topicTaught || "Session report"}</h2><p className="text-sm text-muted-foreground">{r.studentName} · {r.subject}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-        <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">{r.status === "DRAFT" ? "Draft" : "Submitted"}</span>
-        <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">{r.studentPerformanceRating} / 5</span>
-        {editable && <Link className="rounded-lg border border-indigo-200 px-3 py-2 text-indigo-700" href={`/teacher/session/${r.sessionId}/report`}>Reopen report</Link>}
+        <span className="text-primary">{r.status === "DRAFT" ? "Draft" : "Submitted"}</span>
+        <span className="text-muted-foreground">{r.studentPerformanceRating} / 5</span>
+        {editable && <Link className="rounded-lg border px-3 py-1.5 text-primary hover:bg-muted" href={`/teacher/session/${r.sessionId}/report`}>Reopen report</Link>}
       </div>
     </div>
-    <dl className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-4 rounded-xl bg-muted/50 p-4 sm:grid-cols-4">
       <Detail label="Session date" value={r.date} /><Detail label="Time" value={`${r.startTime || "Not recorded"} – ${r.endTime || "Not recorded"}`} />
       <Detail label="Duration" value={`${r.durationMinutes} minutes`} /><Detail label="Class completion" value={r.completionStatus === "PARTIAL" ? "Partially completed" : r.completionStatus === "COMPLETED" ? "Completed" : undefined} />
       {r.partialReason && <Detail label="Reason for partial completion" value={r.partialReason} />}
     </dl>
     <dl className="grid gap-4 sm:grid-cols-2"><Detail label="Topics covered" value={r.topicsCovered?.join(", ")} /><Detail label="Detailed student review" value={r.studentPerformanceNotes} /></dl>
-    <details className="group rounded-xl border border-slate-200 p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-indigo-700">Full report details</summary>
+    <details className="group rounded-xl border border p-4">
+      <summary className="cursor-pointer text-sm font-semibold text-primary">Full report details</summary>
       <div className="mt-5 space-y-6">
         <section className="space-y-3"><h3 className="font-semibold">People</h3><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Detail label="Student" value={[r.studentName, r.studentGrade, r.studentEmail, r.studentPhone].filter(Boolean).join("\n")} />

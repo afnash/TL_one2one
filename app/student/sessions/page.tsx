@@ -1,103 +1,84 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Layers, Play } from "lucide-react";
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
-import { Video, Calendar, Clock, Play, Layers } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { EmptyNote, initials, ListRow, PageHeader, RowList } from "@/components/dashboard/parts";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function StudentSessionsPage() {
   const router = useRouter();
   const { sessions, startLiveSession } = useLMS();
 
-  const [tab,setTab]=useState<"UPCOMING"|"PAST">("UPCOMING");
-  const filtered=sessions.filter(s=>tab==="UPCOMING"?["SCHEDULED","LIVE"].includes(s.status):["COMPLETED","CANCELLED"].includes(s.status));
-  const handleJoin = (sessionId: string) => {
+  const upcoming = sessions.filter((s) => ["SCHEDULED", "LIVE"].includes(s.status));
+  const past = sessions.filter((s) => ["COMPLETED", "CANCELLED"].includes(s.status));
+
+  const join = (sessionId: string) => {
     startLiveSession(sessionId);
     router.push(`/student/session/${sessionId}`);
   };
 
+  const renderList = (list: typeof sessions, isUpcoming: boolean) =>
+    list.length === 0 ? (
+      <EmptyNote>{isUpcoming ? "No lessons scheduled yet." : "No past lessons yet."}</EmptyNote>
+    ) : (
+      <Card>
+        <CardContent>
+          <RowList>
+            {list.map((sess) => (
+              <ListRow
+                key={sess.id}
+                lead={
+                  <Avatar className="size-9">
+                    <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
+                      {initials(sess.teacherName)}
+                    </AvatarFallback>
+                  </Avatar>
+                }
+                title={`${sess.subject}: ${sess.topic}`}
+                meta={`${sess.teacherName} · ${sess.date} at ${sess.scheduledTime} · ${sess.durationMinutes} min${
+                  sess.status === "CANCELLED" ? " · cancelled" : ""
+                }`}
+                action={
+                  isUpcoming ? (
+                    <Button size="sm" onClick={() => join(sess.id)}>
+                      <Play data-icon="inline-start" />
+                      {sess.status === "LIVE" ? "Join now" : "Start"}
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={sess.whiteboardId ? `/student/whiteboards/${sess.whiteboardId}` : "/student/whiteboards"}>
+                        <Layers data-icon="inline-start" />
+                        Whiteboard
+                      </Link>
+                    </Button>
+                  )
+                }
+              />
+            ))}
+          </RowList>
+        </CardContent>
+      </Card>
+    );
+
   return (
-    <AppShell
-      headerTitle="My 1-on-1 Live Sessions"
-      headerSubtitle="Upcoming scheduled classes with your educator and links to past class whiteboards"
-    >
-      <div className="max-w-6xl mx-auto space-y-6 pb-16">
-        <div className="flex gap-3">{(["UPCOMING","PAST"] as const).map(t=><button key={t} className={"border rounded-lg px-4 py-2 "+(t===tab?"bg-indigo-600 text-white":"bg-white")} onClick={()=>setTab(t)}>{t==="UPCOMING"?"Upcoming & live":"Past classes"}</button>)}</div>
-        {!filtered.length&&<p className="text-slate-500">No classes in this tab.</p>}
-        <div className="space-y-4">
-          {filtered.map((sess) => (
-            <div
-              key={sess.id}
-              className="p-6 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-            >
-              <div className="flex items-start gap-4">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-slate-200 shrink-0">
-                  <img
-                    src={sess.teacherAvatar}
-                    alt={sess.teacherName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900">{sess.topic}</h3>
-                    <span className="px-2.5 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded-full">
-                      {sess.subject}
-                    </span>
-                    <span
-                      className={cn(
-                        "px-2 py-0.5 text-[10px] font-bold rounded-full",
-                        sess.status === "COMPLETED"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-indigo-50 text-indigo-700"
-                      )}
-                    >
-                      {sess.status}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-500 font-medium">
-                    Instructor: <strong>{sess.teacherName}</strong>
-                  </p>
-
-                  <div className="flex items-center gap-3 text-xs text-slate-400">
-                    <span className="flex items-center gap-1 font-medium text-slate-600">
-                      <Calendar className="w-3.5 h-3.5" /> {sess.date}
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1 font-medium text-slate-600">
-                      <Clock className="w-3.5 h-3.5" /> {sess.scheduledTime} ({sess.durationMinutes} mins)
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                {["SCHEDULED","LIVE"].includes(sess.status) ? (
-                  <button
-                    onClick={() => handleJoin(sess.id)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Join Class</span>
-                  </button>
-                ) : (
-                  <Link
-                    href={sess.whiteboardId ? `/student/whiteboards/${sess.whiteboardId}` : "/student/whiteboards"}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>Open Whiteboard</span>
-                  </Link>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+    <AppShell headerTitle="Lessons">
+      <div className="mx-auto flex max-w-4xl flex-col gap-6 pb-16">
+        <PageHeader title="Lessons" description="Upcoming lessons with your teacher, and the boards from past ones." />
+        <Tabs defaultValue="upcoming" className="gap-4">
+          <TabsList>
+            <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
+            <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="upcoming">{renderList(upcoming, true)}</TabsContent>
+          <TabsContent value="past">{renderList(past, false)}</TabsContent>
+        </Tabs>
       </div>
     </AppShell>
   );
