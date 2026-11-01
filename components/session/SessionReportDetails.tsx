@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ReportContact, SessionReport } from "@/types";
 import { homeworkStatuses } from "@/lib/session-report";
 import { ReportTimetable } from "./ReportTimetable";
+import { ExpandableDetails } from "./ExpandableDetails";
 
 function Detail({ label, value }: { label: string; value?: ReactNode }) {
   return <div className="min-w-0"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">{value === undefined || value === null || value === "" ? "Not recorded" : value}</dd></div>;
@@ -28,9 +29,8 @@ export function SessionReportDetails({ report: r, editable = false }: { report: 
       {r.partialReason && <Detail label="Reason for partial completion" value={r.partialReason} />}
     </dl>
     <dl className="grid gap-4 sm:grid-cols-2"><Detail label="Topics covered" value={r.topicsCovered?.join(", ")} /><Detail label="Detailed student review" value={r.studentPerformanceNotes} /></dl>
-    <details className="group rounded-xl border border p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-primary">Full report details</summary>
-      <div className="mt-5 space-y-6">
+    <ExpandableDetails label="Full report details">
+      <div className="space-y-6 pt-4">
         <section className="space-y-3"><h3 className="font-semibold">People</h3><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Detail label="Student" value={[r.studentName, r.studentGrade, r.studentEmail, r.studentPhone].filter(Boolean).join("\n")} />
           <Contact label="Parent contact" person={r.parentContact} /><Contact label="Tutor details" person={r.tutorContact} /><Contact label="Manager details" person={r.managerContact} />
@@ -52,6 +52,6 @@ export function SessionReportDetails({ report: r, editable = false }: { report: 
         </dl></section>
         <section className="space-y-3"><h3 className="font-semibold">Student timetable at time of report</h3><ReportTimetable entries={r.timetable ?? []} currentSessionId={r.sessionId} /></section>
       </div>
-    </details>
+    </ExpandableDetails>
   </article>;
 }

@@ -46,7 +46,7 @@ export function AppShell({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full gap-4 overflow-hidden bg-background p-0 text-foreground md:p-3">
+    <div className="flex h-screen w-full gap-4 overflow-clip bg-background p-0 text-foreground md:p-3">
       {!hideSidebar && (
         <div className="hidden h-full shrink-0 md:flex">
           <AppSidebar />
