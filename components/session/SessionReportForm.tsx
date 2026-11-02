@@ -3,23 +3,23 @@
 import { cloneElement, useEffect, useId, useState, type ReactElement, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Star, FileSpreadsheet, AlertCircle, CheckCircle2, Save, Send } from "lucide-react";
+import { Star, AlertCircle, CheckCircle2, Save, Send } from "lucide-react";
 import { useLMS } from "@/lib/store";
 import { buildSessionReport, homeworkStatuses, reportDurationSeconds, validateSessionReport, type ReportInput } from "@/lib/session-report";
 import type { Session, SessionReport } from "@/types";
 import { ReportTimetable } from "./ReportTimetable";
 
-const control = "block w-full mt-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50 font-medium";
+const control = "mt-1.5 block h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-muted";
 
 function Field({ label, required = false, children }: { label: string; required?: boolean; children: ReactElement<{ id?: string }> }) {
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-bold text-slate-700 flex items-center justify-between">
+      <label htmlFor={id} className="flex items-center justify-between text-sm font-medium text-foreground">
         <span>{label}</span>
         {required ? (
-          <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60">
-            * Required
+          <span className="text-xs font-normal text-muted-foreground">
+            Required
           </span>
         ) : null}
       </label>
@@ -30,13 +30,12 @@ function Field({ label, required = false, children }: { label: string; required?
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 shadow-xs">
-      <div className="border-b border-slate-100 pb-3">
-        <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-          <span>{title}</span>
+    <section className="space-y-4 rounded-xl border bg-card p-5 sm:p-6">
+      <div className="border-b pb-3">
+        <h2 className="text-base font-semibold text-foreground">
+          {title}
         </h2>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {children}
     </section>
@@ -166,15 +165,9 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
         void save(submitter?.value !== "draft");
       }}
     >
-      {/* Top Excel/Spreadsheet Banner */}
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-xs sm:text-sm text-emerald-950 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <FileSpreadsheet className="w-5 h-5 text-emerald-700 shrink-0" />
-          <span>
-            <strong>Excel Session Audit Sheet:</strong> Complete the mandatory evaluation fields marked with <strong>* Required</strong>. Data automatically logs to the master academic column sheet.
-          </span>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Fill in the fields marked Required. Submitted reports are added to the master report sheet.
+      </p>
 
       <fieldset disabled={busy} className="space-y-6 min-w-0">
         {/* Section 1: Overview */}
@@ -188,14 +181,14 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
             <Field label="Session Date" required><input type="date" required className={control} value={draft.date} onChange={e => update("date", e.target.value)} /></Field>
             <Field label="Start Time" required><input type="time" step="1" required className={control} value={draft.startTime} onChange={e => update("startTime", e.target.value)} /></Field>
             <Field label="End Time" required><input type="time" step="1" required className={control} value={draft.endTime} onChange={e => update("endTime", e.target.value)} /></Field>
-            <div className="text-xs font-bold text-slate-700">
+            <div className="text-sm font-medium text-foreground">
               Calculated Duration
-              <output aria-live="polite" className="block mt-1.5 rounded-xl bg-emerald-100/70 border border-emerald-200 px-3 py-2 text-emerald-900 font-bold text-xs sm:text-sm">
+              <output aria-live="polite" className="mt-1.5 flex h-10 items-center rounded-lg border bg-muted px-3 text-sm font-medium tabular-nums text-foreground">
                 {durationMinutes} mins ({Math.round(durationSeconds / 60)}m)
               </output>
             </div>
           </div>
-          <Field label="Class Completion Status" required>
+          <Field label="Lesson Completion Status" required>
             <select className={control} value={draft.completionStatus} onChange={e => update("completionStatus", e.target.value as ReportInput["completionStatus"])}>
               <option value="COMPLETED">Completed in Full</option>
               <option value="PARTIAL">Partially Completed</option>
@@ -205,7 +198,7 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
         </Section>
 
         {/* Section 2: Teaching Record & Performance */}
-        <Section title="Lesson Instruction & Comprehension Record" subtitle="Details on topics taught, student understanding, and class observations">
+        <Section title="Lesson Instruction & Comprehension Record" subtitle="Details on topics taught, student understanding, and lesson observations">
           {textField("topicTaught", "Primary Topic Taught", "text", true)}
           <div className="space-y-2">
             <Field label="Subtopics Covered">
@@ -217,7 +210,7 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
                   onChange={e => { setNewTopic(e.target.value); setDirty(true); setMessage(""); }}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTopic(); } }}
                 />
-                <button type="button" onClick={addTopic} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold shrink-0">
+                <button type="button" onClick={addTopic} className="h-10 shrink-0 rounded-lg bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/70">
                   Add
                 </button>
               </div>
@@ -225,9 +218,9 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
             {draft.topicsCovered.length > 0 && (
               <ul className="flex flex-wrap gap-2 pt-1">
                 {draft.topicsCovered.map(topic => (
-                  <li key={topic} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-900">
+                  <li key={topic} className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
                     <span>{topic}</span>
-                    <button type="button" aria-label={`Remove topic ${topic}`} onClick={() => update("topicsCovered", draft.topicsCovered.filter(t => t !== topic))} className="text-emerald-700 hover:text-rose-600">
+                    <button type="button" aria-label={`Remove topic ${topic}`} onClick={() => update("topicsCovered", draft.topicsCovered.filter(t => t !== topic))} className="text-muted-foreground hover:text-destructive">
                       ×
                     </button>
                   </li>
@@ -238,10 +231,10 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
 
           {feedback("workCompleted", "Work Completed & Exercises Covered", 3, true)}
 
-          <fieldset className="border border-slate-200 p-4 rounded-xl bg-slate-50/50">
-            <legend className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          <fieldset className="rounded-xl border bg-background p-4">
+            <legend className="flex items-center gap-2 px-2 text-sm font-medium text-foreground">
               <span>Comprehension & Performance Rating *</span>
-              <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60">* Required</span>
+              <span className="text-xs font-normal text-muted-foreground">Required</span>
             </legend>
             <div className="flex items-center gap-3 mt-1">
               <div className="flex items-center gap-1">
@@ -252,20 +245,20 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
                     aria-label={`Rate ${star} out of 5`}
                     aria-pressed={draft.studentPerformanceRating === star}
                     onClick={() => update("studentPerformanceRating", star)}
-                    className="p-1 rounded-lg focus:ring-2 focus:ring-amber-500 hover:scale-110 transition-transform"
+                    className="p-1 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 transition-transform hover:scale-110"
                   >
-                    <Star className={`w-6 h-6 ${star <= draft.studentPerformanceRating ? "text-amber-500 fill-amber-400" : "text-slate-300"}`} />
+                    <Star className={`w-6 h-6 ${star <= draft.studentPerformanceRating ? "text-amber-500 fill-amber-400" : "text-border"}`} />
                   </button>
                 ))}
               </div>
-              <span className="text-xs font-bold text-slate-700">
+              <span className="text-sm font-medium text-foreground">
                 {draft.studentPerformanceRating ? `${draft.studentPerformanceRating} / 5 Stars` : "Select rating (1-5)"}
               </span>
             </div>
           </fieldset>
 
           {feedback("studentPerformanceNotes", "Student Performance & Understanding Observations", 4, true)}
-          {feedback("classOverview", "Class Overview & Engagement Summary", 3)}
+          {feedback("classOverview", "Lesson Overview & Engagement Summary", 3)}
           {feedback("teacherNotes", "Private Teacher Notes & Internal Observations", 2)}
         </Section>
 
@@ -306,7 +299,7 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
             </Field>
           </div>
 
-          {feedback("nextSessionPlan", "Plan for Next Class Session", 3, true)}
+          {feedback("nextSessionPlan", "Plan for Next Lesson", 3, true)}
         </Section>
 
         {/* Section 4: Timetable */}
@@ -318,8 +311,8 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
         <Section title="Technical Issues Audit" subtitle="Log any audio, video, or connectivity disruptions during the class">
           <Field label="Did Technical Issues Occur?">
             <select className={control} value={draft.technicalIssuesOccurred ? "yes" : "no"} onChange={e => update("technicalIssuesOccurred", e.target.value === "yes")}>
-              <option value="no">No — Class went smoothly</option>
-              <option value="yes">Yes — Disruptions occurred</option>
+              <option value="no">No, Lesson went smoothly</option>
+              <option value="yes">Yes, Disruptions occurred</option>
             </select>
           </Field>
           {draft.technicalIssuesOccurred && (
@@ -333,28 +326,28 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
 
       {/* Error & Success Messages */}
       {error && (
-        <div role="alert" className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+        <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {message && (
-        <div role="status" className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div role="status" className="flex items-center gap-2 rounded-xl border bg-secondary/50 p-3.5 text-sm text-foreground">
+          <CheckCircle2 className="size-4 shrink-0" />
           <span>{message}</span>
         </div>
       )}
 
       {/* Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <Link
           href="/teacher/reports"
           aria-disabled={busy}
           onClick={e => {
             if (busy || (dirty && !window.confirm("Leave without saving your changes?"))) e.preventDefault();
           }}
-          className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           Cancel
         </Link>
@@ -364,7 +357,7 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
             value="draft"
             formNoValidate
             disabled={busy || !!connectionError}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border bg-background px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             <span>Save Draft</span>
@@ -373,10 +366,10 @@ export function SessionReportForm({ session, existing }: { session: Session; exi
             type="submit"
             value="publish"
             disabled={busy || !!connectionError}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-xs disabled:opacity-50 transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:opacity-50"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>{busy ? "Submitting..." : "Submit & Log to Master Sheet"}</span>
+            <span>{busy ? "Submitting..." : "Submit report"}</span>
           </button>
         </div>
       </div>

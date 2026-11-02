@@ -6,21 +6,22 @@ import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { Question, WhiteboardElement } from "@/types";
-import {
-  BookOpen,
-  Calendar,
-  Clock,
-  Users,
-  Plus,
-  Trash2,
-  Layers,
-  Sparkles,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-} from "lucide-react";
+import { initials, EmptyNote, PageHeader } from "@/components/dashboard/parts";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AlertCircle, ArrowLeft, ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const selectClass =
+  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 // Get tomorrow formatted as YYYY-MM-DD
 function getTomorrowDateStr(): string {
@@ -242,447 +243,275 @@ export default function NewAssignmentPage() {
 
   return (
     <AppShell
-      headerTitle="Create New Assignment & Homework"
-      headerSubtitle="Set up questions, assign directly to students, and generate an interactive whiteboard canvas"
+      headerTitle="New assignment"
+      headerSubtitle="Set the questions, choose students and preview the question board"
     >
-      <div className="max-w-5xl mx-auto space-y-6 pb-20">
-        {/* Top bar with back and tab switches */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <button
-            onClick={() => router.push("/teacher/assignments")}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Assignments
-          </button>
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 pb-20">
+        <PageHeader
+          title={kind === "HOMEWORK" ? "New homework" : "New assignment"}
+          description="Step 1 sets the details and students. Step 2 builds the questions and previews the board."
+          action={
+            <Button variant="ghost" onClick={() => router.push("/teacher/assignments")}>
+              <ArrowLeft data-icon="inline-start" />
+              Back to assignments
+            </Button>
+          }
+        />
 
-          <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button
-              onClick={() => setActiveTab("details")}
-              className={cn(
-                "px-4 py-2 text-xs font-bold rounded-xl transition-all",
-                activeTab === "details"
-                  ? "bg-white text-indigo-700 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              1. Assignment Details & Students
-            </button>
-            <button
-              onClick={() => setActiveTab("whiteboard")}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all",
-                activeTab === "whiteboard"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>2. Whiteboard Questions ({questions.length})</span>
-            </button>
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "details" | "whiteboard")}>
+          <TabsList>
+            <TabsTrigger value="details">1. Details and students</TabsTrigger>
+            <TabsTrigger value="whiteboard">2. Questions ({questions.length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Global Error Banner if any */}
         {publishError && (
-          <div
-            role="alert"
-            className="flex items-center gap-2 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold animate-in fade-in"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-            <span>{publishError}</span>
-          </div>
+          <Alert variant="destructive" role="alert">
+            <AlertCircle />
+            <AlertDescription>{publishError}</AlertDescription>
+          </Alert>
         )}
 
-        {/* Tab 1: Assignment Details & Target */}
         {activeTab === "details" && (
-          <div className="p-6 md:p-8 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Type:</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setKind("ASSIGNMENT")}
-                    className={cn(
-                      "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all",
-                      kind === "ASSIGNMENT"
-                        ? "bg-indigo-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Details</CardTitle>
+              <CardDescription>What it is, when it is due and who gets it.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>Type</FieldLabel>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={kind}
+                    onValueChange={(v) => v && setKind(v as "ASSIGNMENT" | "HOMEWORK")}
+                    className="self-start"
                   >
-                    Assignment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setKind("HOMEWORK")}
-                    className={cn(
-                      "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all",
-                      kind === "HOMEWORK"
-                        ? "bg-purple-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    )}
-                  >
-                    Homework
-                  </button>
-                </div>
-              </div>
+                    <ToggleGroupItem value="ASSIGNMENT">Assignment</ToggleGroupItem>
+                    <ToggleGroupItem value="HOMEWORK">Homework</ToggleGroupItem>
+                  </ToggleGroup>
+                </Field>
 
-              <span className="text-xs text-slate-400 font-medium">
-                Step 1 of 2 • Basic Information
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Title <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Quadratic Equations Practice Set"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all placeholder:text-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Subject <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                >
-                  {teacherSubjects.map((sub: string) => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Overview & Instructions
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Give your students any context, hints, or submission expectations..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full p-3.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-indigo-500 leading-relaxed placeholder:text-slate-400"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Due Date <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Due Time
-                </label>
-                <input
-                  type="time"
-                  value={dueTime}
-                  onChange={(e) => setDueTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Difficulty Level
-                </label>
-                <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="Easy">Easy</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Hard">Hard</option>
-                </select>
-              </div>
-            </div>
-
-            <hr className="border-slate-100" />
-
-            {/* Individual vs Multiple vs Broadcast Target Picker */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Assign To Students <span className="text-rose-500">*</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Select individual students or broadcast to the entire roster
-                  </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="new-title">Title</FieldLabel>
+                    <Input
+                      id="new-title"
+                      placeholder="e.g. Quadratic equations practice set"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="new-subject">Subject</FieldLabel>
+                    <select id="new-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={selectClass}>
+                      {teacherSubjects.map((sub: string) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
 
-                {targetType === "MULTIPLE" && (
-                  <button
-                    type="button"
-                    onClick={handleSelectAllStudents}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                <Field>
+                  <FieldLabel htmlFor="new-description">Overview and instructions</FieldLabel>
+                  <Textarea
+                    id="new-description"
+                    rows={2}
+                    placeholder="Context, hints or what you expect in the submission"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </Field>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field>
+                    <FieldLabel htmlFor="new-due">Due date</FieldLabel>
+                    <Input id="new-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="new-time">Due time</FieldLabel>
+                    <Input id="new-time" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="new-difficulty">Difficulty</FieldLabel>
+                    <select
+                      id="new-difficulty"
+                      value={difficulty}
+                      onChange={(e) => setDifficulty(e.target.value as "Easy" | "Medium" | "Hard")}
+                      className={selectClass}
+                    >
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </Field>
+                </div>
+
+                <Separator />
+
+                <Field>
+                  <div className="flex items-center justify-between gap-3">
+                    <FieldLabel>Assign to</FieldLabel>
+                    {targetType === "MULTIPLE" && (
+                      <Button type="button" variant="ghost" size="sm" onClick={handleSelectAllStudents}>
+                        Select all
+                      </Button>
+                    )}
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={targetType}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      setTargetType(v as typeof targetType);
+                      if (v === "INDIVIDUAL" && selectedStudentIds.length === 0 && students[0]) {
+                        setSelectedStudentIds([students[0].id]);
+                      }
+                    }}
+                    className="self-start"
                   >
-                    Select All
-                  </button>
-                )}
-              </div>
+                    <ToggleGroupItem value="INDIVIDUAL">One student</ToggleGroupItem>
+                    <ToggleGroupItem value="MULTIPLE">Several students</ToggleGroupItem>
+                    <ToggleGroupItem value="BROADCAST">All students</ToggleGroupItem>
+                  </ToggleGroup>
+                </Field>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetType("INDIVIDUAL");
-                    if (selectedStudentIds.length === 0 && students[0]) {
-                      setSelectedStudentIds([students[0].id]);
-                    }
-                  }}
-                  className={cn(
-                    "p-3.5 rounded-2xl border text-left text-xs transition-all",
-                    targetType === "INDIVIDUAL"
-                      ? "border-indigo-600 bg-indigo-50/70 font-bold text-indigo-900 shadow-2xs"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                  )}
-                >
-                  <p className="font-bold flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-indigo-600" />
-                    Individual Student
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-normal mt-0.5">
-                    Select 1 specific student
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTargetType("MULTIPLE")}
-                  className={cn(
-                    "p-3.5 rounded-2xl border text-left text-xs transition-all",
-                    targetType === "MULTIPLE"
-                      ? "border-indigo-600 bg-indigo-50/70 font-bold text-indigo-900 shadow-2xs"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                  )}
-                >
-                  <p className="font-bold flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-indigo-600" />
-                    Multiple Students
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-normal mt-0.5">
-                    Custom group selection
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTargetType("BROADCAST")}
-                  className={cn(
-                    "p-3.5 rounded-2xl border text-left text-xs transition-all",
-                    targetType === "BROADCAST"
-                      ? "border-indigo-600 bg-indigo-50/70 font-bold text-indigo-900 shadow-2xs"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                  )}
-                >
-                  <p className="font-bold flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    Broadcast to All
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-normal mt-0.5">
-                    All students in your roster
-                  </p>
-                </button>
-              </div>
-
-              {/* Student Checklist */}
-              {targetType !== "BROADCAST" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                  {students.length > 0 ? (
-                    students.map((st) => {
-                      const isSelected = selectedStudentIds.includes(st.id);
-                      return (
-                        <label
-                          key={st.id}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
-                            isSelected
-                              ? "border-indigo-500 bg-indigo-50/50 shadow-2xs ring-1 ring-indigo-500"
-                              : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
-                          )}
-                        >
-                          <input
-                            type={targetType === "INDIVIDUAL" ? "radio" : "checkbox"}
-                            name="student-target"
-                            checked={isSelected}
-                            onChange={() => {
-                              if (targetType === "INDIVIDUAL") setSelectedStudentIds([st.id]);
-                              else handleToggleStudent(st.id);
-                            }}
-                            className="rounded text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <img
-                            src={st.avatar || "/icon.jpg"}
-                            alt={st.name}
-                            className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                          />
-                          <div className="text-xs">
-                            <p className="font-bold text-slate-900">{st.name}</p>
-                            <p className="text-[10px] text-slate-500">{st.grade || "Student"}</p>
-                          </div>
-                        </label>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-2 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs">
-                      No active students found in your roster. The assignment will be available to all registered students upon publishing.
+                {targetType !== "BROADCAST" &&
+                  (students.length > 0 ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {students.map((st) => {
+                        const isSelected = selectedStudentIds.includes(st.id);
+                        return (
+                          <label
+                            key={st.id}
+                            className={cn(
+                              "flex cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/60",
+                              isSelected && "border-ring bg-secondary/50"
+                            )}
+                          >
+                            <input
+                              type={targetType === "INDIVIDUAL" ? "radio" : "checkbox"}
+                              name="student-target"
+                              checked={isSelected}
+                              onChange={() => {
+                                if (targetType === "INDIVIDUAL") setSelectedStudentIds([st.id]);
+                                else handleToggleStudent(st.id);
+                              }}
+                              className="accent-primary"
+                            />
+                            <Avatar size="sm">
+                              <AvatarImage src={st.avatar} alt="" />
+                              <AvatarFallback>{initials(st.name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 text-sm">
+                              <p className="truncate font-medium text-foreground">{st.name}</p>
+                              <p className="text-xs text-muted-foreground">{st.grade || "Student"}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={isSubmitting}
-                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{isSubmitting ? "Publishing..." : "Publish Assignment Now"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("whiteboard")}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-              >
-                <span>Next: Customize Whiteboard Questions</span>
-                <Layers className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+                  ) : (
+                    <EmptyNote>
+                      No students in your roster yet. The assignment will be available to all registered students when you publish.
+                    </EmptyNote>
+                  ))}
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-between gap-3">
+              <Button type="button" variant="outline" onClick={handlePublish} disabled={isSubmitting}>
+                {isSubmitting ? "Publishing..." : "Publish now"}
+              </Button>
+              <Button type="button" onClick={() => setActiveTab("whiteboard")}>
+                Next: questions
+                <ArrowRight data-icon="inline-end" />
+              </Button>
+            </CardFooter>
+          </Card>
         )}
 
-        {/* Tab 2: Whiteboard Question Builder */}
         {activeTab === "whiteboard" && (
-          <div className="space-y-6">
-            {/* Questions List Editor */}
-            <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Questions List ({questions.length})
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Each question will be rendered as an interactive problem card on the student's canvas
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddQuestion}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl border border-indigo-200 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Question</span>
-                </button>
-              </div>
-
-              <div className="space-y-3">
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Questions ({questions.length})</CardTitle>
+                <CardDescription>Each question becomes a card on the student&apos;s whiteboard.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
                 {questions.map((q) => (
-                  <div
-                    key={q.id}
-                    className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3"
-                  >
-                    <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                  <div key={q.id} className="flex items-start gap-3 rounded-xl border bg-background p-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-medium text-secondary-foreground">
                       {q.number}
                     </span>
-                    <div className="flex-1 space-y-2">
-                      <input
-                        type="text"
-                        value={q.text}
-                        onChange={(e) => handleUpdateQuestion(q.id, { text: e.target.value })}
-                        placeholder={`Question ${q.number}: Enter problem statement (e.g., Solve 2x + 5 = 15)`}
-                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-indigo-500 font-medium"
+                    <Input
+                      value={q.text}
+                      onChange={(e) => handleUpdateQuestion(q.id, { text: e.target.value })}
+                      placeholder={`Question ${q.number}, e.g. Solve 2x + 5 = 15`}
+                      aria-label={`Question ${q.number} text`}
+                    />
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={q.maxScore}
+                        onChange={(e) => handleUpdateQuestion(q.id, { maxScore: parseInt(e.target.value, 10) || 1 })}
+                        className="w-16 text-center"
+                        aria-label={`Marks for question ${q.number}`}
                       />
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1 text-xs">
-                        <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={q.maxScore}
-                          onChange={(e) =>
-                            handleUpdateQuestion(q.id, { maxScore: parseInt(e.target.value, 10) || 1 })
-                          }
-                          className="w-14 px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-center font-bold text-slate-900"
-                        />
-                        <span className="text-slate-400 font-semibold text-[11px]">pts</span>
-                      </div>
-                      <button
+                      <span className="text-xs text-muted-foreground">marks</span>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleRemoveQuestion(q.id)}
-                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
-                        title="Remove question"
+                        aria-label={`Remove question ${q.number}`}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        <Trash2 />
+                      </Button>
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
+                <Button type="button" variant="outline" className="self-start" onClick={handleAddQuestion}>
+                  <Plus data-icon="inline-start" />
+                  Add question
+                </Button>
+              </CardContent>
+            </Card>
 
-            {/* Live Interactive Canvas Preview */}
-            <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900">Whiteboard Canvas Preview</h3>
-                  <p className="text-[11px] text-slate-400">
-                    Students will see this layout and solve directly on their interactive whiteboard
-                  </p>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Board preview</CardTitle>
+                <CardDescription>Students solve directly on this board. You can add drawings before publishing.</CardDescription>
+                <CardAction>
+                  <Button type="button" onClick={handlePublish} disabled={isSubmitting}>
+                    {isSubmitting ? "Publishing..." : "Publish"}
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[480px] w-full overflow-hidden rounded-xl border">
+                  <WhiteboardCanvas
+                    onSave={(elements) => setBoardElements(elements)}
+                    initialWhiteboard={{
+                      id: "wb-new-asg-preview",
+                      title: `${title || "New assignment"} (question board)`,
+                      subject: subject || "Mathematics",
+                      category: "ASSIGNMENT_QUESTION",
+                      lastEdited: new Date().toISOString(),
+                      elements: boardElements || generateWhiteboardElements(),
+                    }}
+                    showTeacherTools={true}
+                    roleLabel="Teacher"
+                  />
                 </div>
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl shadow-xs transition-colors"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isSubmitting ? "Publishing..." : "Publish Assignment"}</span>
-                </button>
-              </div>
-
-              <div className="h-[480px] w-full rounded-2xl overflow-hidden border border-slate-200 shadow-2xs">
-                <WhiteboardCanvas
-                  onSave={(elements) => setBoardElements(elements)}
-                  initialWhiteboard={{
-                    id: "wb-new-asg-preview",
-                    title: `${title || "New Assignment"} (Question Canvas)`,
-                    subject: subject || "Mathematics",
-                    category: "ASSIGNMENT_QUESTION",
-                    lastEdited: new Date().toISOString(),
-                    elements: boardElements || generateWhiteboardElements(),
-                  }}
-                  showTeacherTools={true}
-                  roleLabel="Teacher"
-                />
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

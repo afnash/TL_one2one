@@ -1,90 +1,90 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { useLMS } from "@/lib/store";
+import { AuthShell } from "@/components/brand/AuthShell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function ManageLogin() {
   const router = useRouter();
-  const { switchRole } = useLMS();
+  const { refreshSession } = useLMS();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const form = new FormData(e.currentTarget);
+    try {
+      const r = await fetch("/api/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(form)),
+      });
+      const result = await r.json();
+      if (!r.ok) throw new Error(result.error);
+      await refreshSession();
+      router.push("/admin/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <main className="min-h-screen grid place-items-center p-6 bg-slate-50">
-      <form
-        className="bg-white border border-slate-200 rounded-2xl p-8 w-full max-w-md space-y-5 shadow-sm"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError("");
-          const form = new FormData(e.currentTarget);
-          try {
-            const r = await fetch("/api/manage", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(Object.fromEntries(form)),
-            });
-            const result = await r.json();
-            if (!r.ok) throw new Error(result.error);
-            switchRole("SUPERADMIN");
-            router.push("/admin/dashboard");
-            router.refresh();
-          } catch (e) {
-            setError(e instanceof Error ? e.message : "Login failed");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <Link href="/" className="inline-block mb-1">
-          <Image
-            src="/icon.jpg"
-            alt="OneToOne Logo"
-            width={130}
-            height={44}
-            className="h-9 w-auto object-contain"
-            priority
-          />
-        </Link>
-        <h1 className="text-xl font-bold text-slate-900">Administrator Console</h1>
-        <label className="block text-xs font-bold text-slate-700">
-          Username
-          <input
-            name="username"
-            required
-            autoComplete="username"
-            className="mt-1 block border border-slate-200 rounded-xl p-3 w-full text-xs font-medium focus:ring-2 focus:ring-blue-500"
-          />
-        </label>
-        <label className="block text-xs font-bold text-slate-700">
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="mt-1 block border border-slate-200 rounded-xl p-3 w-full text-xs font-medium focus:ring-2 focus:ring-blue-500"
-          />
-        </label>
-        {error && <p role="alert" className="text-rose-600 text-xs font-semibold">{error}</p>}
-        <button
-          disabled={busy}
-          className="rounded-xl p-3 bg-blue-600 hover:bg-blue-700 text-white w-full text-xs font-bold shadow-xs transition-colors disabled:opacity-50"
-        >
-          {busy ? "Signing in..." : "Sign in as Administrator"}
-        </button>
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <Link href="/" className="hover:text-blue-600">
-            ← Back to Home
-          </Link>
-          <Link href="/login" className="hover:text-blue-600 font-medium">
-            User / Faculty / Manager Access
-          </Link>
-        </div>
-      </form>
-    </main>
+    <AuthShell variant="admin">
+      <Card className="w-full">
+        <form onSubmit={onSubmit} className="flex flex-col gap-6">
+          <CardHeader>
+            <CardTitle className="text-2xl">Administrator console</CardTitle>
+            <CardDescription>Restricted access. Sign in with your administrator account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="username">Username</FieldLabel>
+                <Input id="username" name="username" required autoComplete="username" />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="admin-password">Password</FieldLabel>
+                <Input id="admin-password" name="password" type="password" required autoComplete="current-password" />
+              </Field>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button type="submit" size="lg" disabled={busy}>
+                {busy && <Spinner data-icon="inline-start" />}
+                {busy ? "Signing in" : "Sign in as administrator"}
+              </Button>
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="justify-between">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/">
+                <ArrowLeft data-icon="inline-start" />
+                Home
+              </Link>
+            </Button>
+            <Button variant="link" size="sm" asChild>
+              <Link href="/login">Student, teacher or manager sign-in</Link>
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </AuthShell>
   );
 }

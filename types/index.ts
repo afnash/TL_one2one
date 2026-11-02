@@ -48,7 +48,7 @@ export interface User {
   avatar: string;
   role: UserRole;
   phone?: string;
-  password?: string;
+  hasPassword?: boolean;
   timezone?: string;
   title?: string;
   bio?: string;
@@ -58,7 +58,9 @@ export interface Manager {
   id: string;
   name: string;
   email: string;
+  /** Write-only: sent once to set a password; reads return only hasPassword. */
   password?: string;
+  hasPassword?: boolean;
   phone?: string;
   location?: string;
   avatar?: string;
@@ -74,13 +76,15 @@ export interface Teacher {
   id: string;
   name: string;
   email: string;
+  /** Write-only: sent once to set a password; reads return only hasPassword. */
   password?: string;
+  hasPassword?: boolean;
   avatar: string;
   subjects: string[];
   rating: number;
   totalStudents: number;
   totalSessions: number;
-  status: "active" | "away" | "offline";
+  status: "active" | "away" | "offline" | "inactive";
   joinedDate: string;
   managerId?: string;
   managerName?: string;
@@ -93,7 +97,9 @@ export interface Student {
   id: string;
   name: string;
   email: string;
+  /** Write-only: sent once to set a password; reads return only hasPassword. */
   password?: string;
+  hasPassword?: boolean;
   avatar: string;
   grade: string;
   subjects: string[];

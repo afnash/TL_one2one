@@ -130,12 +130,14 @@ export const INITIAL_OPPORTUNITIES: Opportunity[] = [
   }
 ];
 
+// Scoped per user so applications are not shared between accounts on the same browser.
 const SOFIA_APPLICATIONS_KEY = "sofia_user_applications";
+const applicationsKey = (userId: string) => `${SOFIA_APPLICATIONS_KEY}:${userId}`;
 
-export function getStoredApplications(): OpportunityApplication[] {
-  if (typeof window === "undefined") return [];
+export function getStoredApplications(userId: string): OpportunityApplication[] {
+  if (typeof window === "undefined" || !userId) return [];
   try {
-    const raw = localStorage.getItem(SOFIA_APPLICATIONS_KEY);
+    const raw = localStorage.getItem(applicationsKey(userId));
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -143,10 +145,10 @@ export function getStoredApplications(): OpportunityApplication[] {
   }
 }
 
-export function saveStoredApplications(apps: OpportunityApplication[]) {
-  if (typeof window === "undefined") return;
+export function saveStoredApplications(userId: string, apps: OpportunityApplication[]) {
+  if (typeof window === "undefined" || !userId) return;
   try {
-    localStorage.setItem(SOFIA_APPLICATIONS_KEY, JSON.stringify(apps));
+    localStorage.setItem(applicationsKey(userId), JSON.stringify(apps));
   } catch (e) {
     console.error("Failed to persist applications", e);
   }

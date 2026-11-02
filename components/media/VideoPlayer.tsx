@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Play, X, ExternalLink, Maximize2, Video as VideoIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeResourceUrl } from "@/lib/supabase";
 
 export interface VideoInfo {
   type: "youtube" | "vimeo" | "direct" | "embed";
@@ -48,7 +49,7 @@ export function parseVideoUrl(url: string): VideoInfo {
     return {
       type: "direct",
       url: trimmed,
-      embedUrl: trimmed,
+      embedUrl: safeResourceUrl(trimmed),
     };
   }
 
@@ -56,7 +57,8 @@ export function parseVideoUrl(url: string): VideoInfo {
   return {
     type: "embed",
     url: trimmed,
-    embedUrl: trimmed,
+    // Only http(s)/same-site URLs may be framed; javascript: and data:text/html become "".
+    embedUrl: safeResourceUrl(trimmed),
   };
 }
 
@@ -95,6 +97,7 @@ export function VideoCardPreview({ url, title, className, onOpenModal }: VideoCa
             title={title}
             className="w-full h-full border-0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
             allowFullScreen
           />
         )}
@@ -194,7 +197,7 @@ export function VideoPlayerModal({
 
           <div className="flex items-center gap-2">
             <a
-              href={url}
+              href={safeResourceUrl(url) || undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -230,6 +233,7 @@ export function VideoPlayerModal({
               title={title}
               className="w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
               allowFullScreen
             />
           )}

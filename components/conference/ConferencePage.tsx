@@ -1,8 +1,14 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Copy, Plus, Users, LogOut } from "lucide-react";
+import { Copy, Plus, LogOut } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader, Section } from "@/components/dashboard/parts";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/dashboard/ConfirmAction";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
 import { useLMS } from "@/lib/store";
 import { conferenceRPC, formatConferenceCode, hostStorageKey, normalizeConferenceCode, type Conference } from "@/lib/conference";
@@ -54,27 +60,33 @@ export function ConferencePage() {
   };
   return <AppShell headerTitle="Conference" headerSubtitle="Group video meetings with a host-led live whiteboard">
     {room ? <ConferenceRoom key={room.code} initialRoom={room} hostToken={token} onLeave={() => setRoom(null)} /> :
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="rounded-3xl bg-slate-900 p-8 text-white">
-          <Users className="mb-4 h-9 w-9 text-indigo-300" />
-          <h1 className="text-3xl font-bold">One room. Everyone together.</h1>
-          <p className="mt-3 max-w-xl text-slate-300">Share a conference code to bring multiple participants into a video call. The host teaches on the whiteboard while everyone watches live.</p>
-        </div>
+      <div className="mx-auto flex max-w-4xl flex-col gap-6 pb-16">
+        <PageHeader title="Conference" description="Share a code to bring several people into one video call. The host teaches on the whiteboard while everyone watches live." />
         <div className="grid gap-5 md:grid-cols-2">
-          {role === "TEACHER" && <form onSubmit={create} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold">Host a conference</h2>
-            <label className="block text-sm font-medium">Meeting title<input required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Revision workshop" className="mt-2 w-full rounded-xl border border-slate-300 p-3" /></label>
-            <button disabled={busy || !title.trim()} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white disabled:opacity-50"><Plus className="h-4 w-4" />{busy ? "Please wait…" : "Create conference"}</button>
-            <p className="text-xs text-slate-500">Your host controls stay in this browser. Keep the room code to rejoin.</p>
-          </form>}
-          <form onSubmit={join} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold">Join a conference</h2>
-            <label className="block text-sm font-medium">Conference code<input required maxLength={40} value={code} onChange={event => setCode(event.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX" autoCapitalize="characters" spellCheck={false} className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-mono uppercase" /></label>
-            <button disabled={busy || !code.trim()} className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Please wait…" : "Join conference"}</button>
-            <p className="text-xs text-slate-500">Teachers and students can join with the same code. Only the host can edit the board.</p>
-          </form>
+          {role === "TEACHER" && (
+            <Section title="Host a conference">
+              <form onSubmit={create} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="conf-title">Meeting title</Label>
+                  <Input id="conf-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Revision workshop" />
+                </div>
+                <Button disabled={busy || !title.trim()} className="self-start"><Plus data-icon="inline-start" />{busy ? "Please wait…" : "Create conference"}</Button>
+                <p className="text-xs text-muted-foreground">Your host controls stay in this browser. Keep the room code to rejoin.</p>
+              </form>
+            </Section>
+          )}
+          <Section title="Join a conference">
+            <form onSubmit={join} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="conf-code">Conference code</Label>
+                <Input id="conf-code" required maxLength={40} value={code} onChange={event => setCode(event.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX" autoCapitalize="characters" spellCheck={false} className="font-mono uppercase" />
+              </div>
+              <Button type="submit" variant={role === "TEACHER" ? "outline" : "default"} disabled={busy || !code.trim()} className="self-start">{busy ? "Please wait…" : "Join conference"}</Button>
+              <p className="text-xs text-muted-foreground">Teachers and students can join with the same code. Only the host can edit the board.</p>
+            </form>
+          </Section>
         </div>
-        {error && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
+        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       </div>}
   </AppShell>;
 }
@@ -134,25 +146,33 @@ function ConferenceRoom({ initialRoom, hostToken, onLeave }: { initialRoom: Conf
     try { await navigator.clipboard.writeText(formatConferenceCode(room.code)); setCopied(true); }
     catch { setError("Could not copy automatically. Select and copy the code above."); }
   };
-  return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-      <div><h1 className="text-xl font-bold">{room.title}</h1><p className="mt-1 text-sm text-slate-500">Hosted by {room.hostName} · {isHost ? "You control the whiteboard" : "View-only whiteboard"}</p></div>
-      <div className="flex flex-wrap items-center gap-3">
-        <code className="select-all rounded-lg bg-indigo-50 px-3 py-2 font-semibold text-indigo-700">{formatConferenceCode(room.code)}</code>
-        <button onClick={copy} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><Copy className="h-4 w-4" />{copied ? "Copied" : "Copy code"}</button>
-        <button disabled={saving} onClick={onLeave} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"><LogOut className="h-4 w-4" />Leave</button>
-        {isHost && room.status === "LIVE" && <button disabled={saving || !!error} onClick={() => { if (window.confirm("End this conference for everyone? The whiteboard will become read-only.")) update("end"); }} className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">End conference</button>}
+  return <div className="flex flex-col gap-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
+      <div><h1 className="text-xl font-semibold">{room.title}</h1><p className="mt-1 text-sm text-muted-foreground">Hosted by {room.hostName} · {isHost ? "You control the whiteboard" : "View-only whiteboard"}</p></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <code className="select-all rounded-lg bg-secondary px-3 py-2 font-semibold text-secondary-foreground">{formatConferenceCode(room.code)}</code>
+        <Button variant="outline" onClick={copy}><Copy data-icon="inline-start" />{copied ? "Copied" : "Copy code"}</Button>
+        <Button variant="outline" disabled={saving} onClick={onLeave}><LogOut data-icon="inline-start" />Leave</Button>
+        {isHost && room.status === "LIVE" && (
+          <ConfirmAction
+            trigger={<Button variant="destructive" disabled={saving || !!error}>End conference</Button>}
+            title="End this conference for everyone?"
+            description="The whiteboard becomes read-only and video disconnects for all participants."
+            confirmLabel="End conference"
+            onConfirm={() => update("end")}
+          />
+        )}
       </div>
     </div>
-    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    <p role="status" className="text-xs text-slate-500">{room.status === "ENDED" ? "The host ended this conference. Video is disconnected and the saved board is read-only." : saving ? "Saving host’s board…" : "Live whiteboard · syncs every 2 seconds"}</p>
+    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+    <p role="status" className="text-xs text-muted-foreground">{room.status === "ENDED" ? "The host ended this conference. Video is disconnected and the saved board is read-only." : saving ? "Saving host’s board…" : "Live whiteboard · syncs every 2 seconds"}</p>
     <div className={`grid gap-4 ${room.status === "LIVE" ? "lg:grid-cols-[minmax(300px,2fr)_minmax(0,3fr)]" : ""}`}>
       {room.status === "LIVE" && <ConferenceVideo roomName={room.videoRoom} displayName={user.name} />}
-      <div className="h-[70vh] min-h-[480px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="h-[70vh] min-h-[480px] overflow-hidden rounded-xl border bg-card">
         <WhiteboardCanvas key={room.board.id} initialWhiteboard={room.board} readOnly={!isHost || room.status !== "LIVE" || !!error} showTeacherTools={isHost} roleLabel={isHost ? "Host" : "Participant"} onSave={elements => update("board", elements)} />
       </div>
     </div>
-    {isHost && <p className="text-xs text-slate-500">Leaving keeps this conference open. Use End conference to close it for participants.</p>}
+    {isHost && <p className="text-xs text-muted-foreground">Leaving keeps this conference open. Use End conference to close it for participants.</p>}
   </div>;
 }
 

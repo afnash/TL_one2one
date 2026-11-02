@@ -40,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user uploads (local fallback when Supabase Storage is not configured)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# misspelled env file guard
+env.local
+
+# local test credentials
+scripts/dev-accounts.md

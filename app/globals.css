@@ -1,83 +1,138 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Brand: the app's old "indigo" scale is remapped to the brand blue so every
+   existing indigo-* utility picks up the brand colour without per-page edits. */
+@theme {
+  --color-indigo-50: #eff1fd;
+  --color-indigo-100: #dfe3fb;
+  --color-indigo-200: #bfc7f6;
+  --color-indigo-300: #919eee;
+  --color-indigo-400: #6173e0;
+  --color-indigo-500: #3748c4;
+  --color-indigo-600: #1c2aa8;
+  --color-indigo-700: #17228a;
+  --color-indigo-800: #131c6d;
+  --color-indigo-900: #0f1655;
+  --color-indigo-950: #090d36;
+  --color-brand: #17a3a3;
+  --color-navy: #0c1470;
+  --color-sun: #f5b942;
+
+  /* Motion: one fast duration for every interaction. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@theme inline {
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-display), var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+:root {
+  --background: #fafbff;
+  --foreground: #101633;
+  --card: #ffffff;
+  --card-foreground: #101633;
+  --popover: #ffffff;
+  --popover-foreground: #101633;
+  --primary: #1c2aa8;
+  --primary-foreground: #ffffff;
+  --secondary: #eceefb;
+  --secondary-foreground: #151f7a;
+  --muted: #f2f4fb;
+  --muted-foreground: #5a6180;
+  --accent: #e3f5f5;
+  --accent-foreground: #0b5f5f;
+  --destructive: #dc2626;
+  --border: #e4e7f2;
+  --input: #d6daea;
+  --ring: #4a5ad0;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #101633;
+  --sidebar-primary: #1c2aa8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eceefb;
+  --sidebar-accent-foreground: #151f7a;
+  --sidebar-border: #e4e7f2;
+  --sidebar-ring: #4a5ad0;
+}
 
 @layer base {
-  :root {
-    --background: #f8f9ff;
-    --foreground: #0b1c30;
-    --card: rgba(255, 255, 255, 0.75);
-    --card-foreground: #0f172a;
-    --popover: rgba(255, 255, 255, 0.9);
-    --popover-foreground: #0f172a;
-    --primary: #4648d4;
-    --primary-hover: #393bbf;
-    --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #1e293b;
-    --muted: #f8fafc;
-    --muted-foreground: #64748b;
-    --accent: #eef2ff;
-    --accent-foreground: #3730a3;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: rgba(118, 117, 134, 0.18);
-    --input: #eff4ff;
-    --ring: #4648d4;
-    --radius: 1rem;
+  * {
+    @apply border-border outline-ring/50;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display), var(--font-body), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-* {
-  border-color: rgba(226, 232, 240, 0.8);
-  box-sizing: border-box;
-}
-
-body {
-  background-color: #f8f9ff;
-  color: #0b1c30;
-  font-feature-settings: "rlig" 1, "calt" 1;
-  -webkit-font-smoothing: antialiased;
-  font-family: "Segoe UI Variable", "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif;
-}
-
-/* Luxury Glassmorphism Utilities */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
-}
-
+/* Surface utilities (formerly glassmorphism): flat, bordered, minimal. */
+.glass-panel,
 .glass-card {
-  background: rgba(229, 238, 255, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(16, 22, 51, 0.04);
 }
 
 .glass-card-interactive {
-  background: rgba(229, 238, 255, 0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(16, 22, 51, 0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .glass-card-interactive:hover {
-  background: rgba(255, 255, 255, 0.95);
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px -4px rgba(79, 70, 229, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
-  border-color: rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+  border-color: var(--ring);
+  box-shadow: 0 8px 24px -8px rgba(28, 42, 168, 0.18);
 }
 
 .glass-dark {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+  background: var(--navy-surface, #0f2a4a);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Custom sleek scrollbar */
@@ -109,4 +164,35 @@ body {
 
 .audio-bar {
   animation: wave 1.2s ease-in-out infinite;
+}
+
+/* Entrance: 240ms fade + 8px rise, used by <Reveal>. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  opacity: 0;
+}
+.reveal.is-visible {
+  animation: rise-in 240ms var(--ease-out-soft) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+  .reveal { opacity: 1; }
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+.draw-line {
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+  animation: draw 600ms 150ms var(--ease-out-soft) forwards;
 }

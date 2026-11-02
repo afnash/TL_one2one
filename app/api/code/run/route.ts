@@ -1,11 +1,16 @@
-﻿// Code runs only in Judge0's external sandbox, never in the Next.js process.
+﻿import { rateLimited } from "@/lib/rate-limit";
+import { getSession, sameOrigin } from "@/lib/session";
+
+// Code runs only in Judge0's external sandbox, never in the Next.js process.
 const languages: Record<string, number> = { Python: 71, JavaScript: 63, C: 50, "C++": 54, Java: 62 };
 const endpoint = "https://ce.judge0.com/submissions";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Use Run code from this app." }, { status: 403 });
+  if (!sameOrigin(request)) return Response.json({ error: "Use Run code from this app." }, { status: 403 });
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Sign in to run code." }, { status: 401 });
+  if (rateLimited(`code:${session.id}`, 30, 10 * 60 * 1000)) return Response.json({ error: "Too many runs. Wait a few minutes and retry." }, { status: 429 });
   let input;
   try {
     const text = await request.text();

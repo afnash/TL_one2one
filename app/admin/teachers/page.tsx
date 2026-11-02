@@ -1,4 +1,14 @@
 "use client";
+
 import { AppShell } from "@/components/layout/AppShell";
 import { RosterManager } from "@/components/RosterManager";
-export default function Page(){return <AppShell><div className="max-w-6xl mx-auto space-y-5"><h1 className="text-2xl font-bold">Manage teachers</h1><RosterManager kind="TEACHER"/></div></AppShell>;}
+
+export default function AdminTeachersPage() {
+  return (
+    <AppShell headerTitle="Teachers">
+      <div className="mx-auto max-w-6xl pb-12">
+        <RosterManager kind="TEACHER" title="Teachers" description="Create teacher accounts and assign them to managers." />
+      </div>
+    </AppShell>
+  );
+}

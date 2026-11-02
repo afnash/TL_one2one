@@ -1,9 +1,9 @@
--- OneToOne LMS: paste this entire file in the Supabase SQL Editor and Run.
+-- sofiaa: paste this entire file in the Supabase SQL Editor and Run.
 -- No sample data. Re-runnable; existing rows are preserved.
--- TEMPORARY ROLE-ONLY MODE: anon policies deliberately allow shared read/write.
--- Anyone holding the public key can access these records. The /manage password
--- protects the admin pages, not the public Data API. Add Auth + ownership RLS
--- before using this project for confidential student information.
+-- LOCKED MODE: the public (anon/publishable) key has no access to any table,
+-- function or storage write. The Next.js server reaches the database with
+-- SUPABASE_SECRET_KEY after checking the signed session cookie (app/api/*).
+-- Passwords are stored only as scrypt hashes in data->>'passwordHash'.
 begin;
 
 do $$
@@ -13,8 +13,8 @@ begin
     execute format('create table if not exists public.%I (id text primary key, data jsonb not null, updated_at timestamptz not null default now(), check (jsonb_typeof(data) = ''object''), check (data->>''id'' = id))', 'lms_' || tab);
     execute format('alter table public.%I enable row level security', 'lms_' || tab);
     execute format('drop policy if exists prototype_access on public.%I', 'lms_' || tab);
-    execute format('create policy prototype_access on public.%I for all to anon, authenticated using (true) with check (true)', 'lms_' || tab);
-    execute format('grant select, insert, update, delete on public.%I to anon, authenticated', 'lms_' || tab);
+    execute format('revoke all on public.%I from public, anon, authenticated', 'lms_' || tab);
+    execute format('grant select, insert, update, delete on public.%I to service_role', 'lms_' || tab);
     execute format('create index if not exists %I on public.%I using gin(data)', 'lms_' || tab || '_data_idx', 'lms_' || tab);
   end loop;
 end $$;
@@ -29,25 +29,49 @@ create index if not exists lms_materials_subject on public.lms_materials ((data-
 create index if not exists lms_materials_topic on public.lms_materials ((data->>'topic'));
 create index if not exists lms_materials_keywords on public.lms_materials using gin ((data->'keywords'));
 
--- RAG Study Materials Keyword & Context Search RPC
+-- Value sanity checks (NOT VALID: enforced for new writes, existing rows are not rescanned).
+-- A score must be a number between 0 and the submission's maxScore; a due date, when set,
+-- must be an ISO calendar date. The API (lib/data-access.ts) validates the same rules first.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'lms_submissions_score_range') then
+    alter table public.lms_submissions add constraint lms_submissions_score_range check (
+      case when data ? 'score' and jsonb_typeof(data->'score') <> 'null'
+        then jsonb_typeof(data->'score') = 'number' and (data->>'score')::numeric >= 0
+          and (data->>'score')::numeric <= case when jsonb_typeof(data->'maxScore') = 'number' then (data->>'maxScore')::numeric else 1000000 end
+        else true end) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'lms_assignments_due_date_format') then
+    alter table public.lms_assignments add constraint lms_assignments_due_date_format check (
+      coalesce(data->>'dueDate', '') = '' or data->>'dueDate' ~ '^\d{4}-\d{2}-\d{2}$') not valid;
+  end if;
+end $$;
+
+-- RAG Study Materials Keyword & Context Search RPC. % _ and \ in the query (and
+-- in stored keywords) are escaped so they match literally instead of as wildcards.
 create or replace function public.search_materials(p_query text)
 returns setof jsonb language sql stable set search_path = public as $$
-  select data from public.lms_materials
-  where p_query is not null and length(trim(p_query)) > 0
+  with q as (
+    select trim(p_query) as raw,
+      '%' || replace(replace(replace(trim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
+  )
+  select m.data from public.lms_materials m, q
+  where p_query is not null and length(q.raw) > 0
     and (
-      data->>'subject' ilike '%' || trim(p_query) || '%'
-      or data->>'topic' ilike '%' || trim(p_query) || '%'
-      or data->>'title' ilike '%' || trim(p_query) || '%'
-      or data->>'description' ilike '%' || trim(p_query) || '%'
+      m.data->>'subject' ilike q.pattern
+      or m.data->>'topic' ilike q.pattern
+      or m.data->>'title' ilike q.pattern
+      or m.data->>'description' ilike q.pattern
       or exists (
-        select 1 from jsonb_array_elements_text(coalesce(data->'keywords', '[]'::jsonb)) kw
-        where kw ilike '%' || trim(p_query) || '%' or trim(p_query) ilike '%' || kw || '%'
+        select 1 from jsonb_array_elements_text(coalesce(m.data->'keywords', '[]'::jsonb)) kw
+        where kw ilike q.pattern
+          or q.raw ilike '%' || replace(replace(replace(kw, '\', '\\'), '%', '\%'), '_', '\_') || '%'
       )
     )
-  order by updated_at desc;
+  order by m.updated_at desc;
 $$;
-revoke all on function public.search_materials(text) from public;
-grant execute on function public.search_materials(text) to anon, authenticated;
+revoke all on function public.search_materials(text) from public, anon, authenticated;
+grant execute on function public.search_materials(text) to service_role;
 
 -- Merge changed fields atomically. Board element deltas are merged under a row
 -- lock: simultaneous strokes with different IDs are never lost. Deleting a stroke
@@ -96,8 +120,8 @@ begin
   end if;
   execute format('insert into public.%I (id,data) values ($1,$2) on conflict (id) do update set data=excluded.data, updated_at=now()', p_table) using p_id, merged;
 end $$;
-revoke all on function public.lms_patch(text,text,jsonb,jsonb) from public;
-grant execute on function public.lms_patch(text,text,jsonb,jsonb) to anon, authenticated;
+revoke all on function public.lms_patch(text,text,jsonb,jsonb) from public, anon, authenticated;
+grant execute on function public.lms_patch(text,text,jsonb,jsonb) to service_role;
 
 -- Conference tables & RPCs
 create table if not exists public.conference_rooms (
@@ -170,22 +194,40 @@ begin
 end;
 $$;
 
-revoke all on function public.conference_create(text,text,text) from public;
-revoke all on function public.conference_read(text) from public;
-revoke all on function public.conference_update(text,text,integer,text,jsonb) from public;
-grant execute on function public.conference_create(text,text,text) to anon, authenticated;
-grant execute on function public.conference_read(text) to anon, authenticated;
-grant execute on function public.conference_update(text,text,integer,text,jsonb) to anon, authenticated;
+revoke all on function public.conference_create(text,text,text) from public, anon, authenticated;
+revoke all on function public.conference_read(text) from public, anon, authenticated;
+revoke all on function public.conference_update(text,text,integer,text,jsonb) from public, anon, authenticated;
+grant execute on function public.conference_create(text,text,text) to service_role;
+grant execute on function public.conference_read(text) to service_role;
+grant execute on function public.conference_update(text,text,integer,text,jsonb) to service_role;
 
 -- Storage
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('study-materials', 'study-materials', true, 52428800, array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/png','image/jpeg','video/mp4','text/plain'])
-on conflict (id) do nothing;
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+-- Public bucket: files are readable by URL. Uploads go through /api/upload with
+-- the secret key, so anon/authenticated get no insert, list or delete policy.
 drop policy if exists lms_material_upload on storage.objects;
-create policy lms_material_upload on storage.objects for insert to anon, authenticated with check (bucket_id = 'study-materials');
 drop policy if exists lms_material_read on storage.objects;
-create policy lms_material_read on storage.objects for select to anon, authenticated using (bucket_id = 'study-materials');
 drop policy if exists lms_material_delete on storage.objects;
-create policy lms_material_delete on storage.objects for delete to anon, authenticated using (bucket_id = 'study-materials');
 notify pgrst, 'reload schema';
 commit;
+
+-- ONE-TIME MAINTENANCE (do not run as part of setup). Legacy rows may still hold a
+-- plaintext `password`. Sign-in NO LONGER accepts plaintext (unless the temporary env
+-- flag ALLOW_PLAINTEXT_PASSWORDS=true is set). PREFERRED: run
+--   node --env-file=.env.local scripts/hash-legacy-passwords.mjs
+-- which hashes each legacy password so users keep their login. Only if you would rather
+-- discard them, run this block once: accounts without a passwordHash then need an
+-- admin/manager to set a new password, and bumping tokenVersion signs out open sessions.
+-- begin;
+-- do $$
+-- declare tab text;
+-- begin
+--   foreach tab in array array['lms_managers','lms_teachers','lms_students'] loop
+--     execute format($f$update public.%I set data = (data - 'password')
+--       || jsonb_build_object('tokenVersion', coalesce((data->>'tokenVersion')::int, 0) + 1), updated_at = now()
+--       where data ? 'password'$f$, tab);
+--   end loop;
+-- end $$;
+-- commit;

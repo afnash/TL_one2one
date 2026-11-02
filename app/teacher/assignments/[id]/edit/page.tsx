@@ -5,21 +5,19 @@ import { useRouter } from "next/navigation";
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { WhiteboardCanvas } from "@/components/whiteboard/WhiteboardCanvas";
-import { Question, WhiteboardElement } from "@/types";
-import {
-  BookOpen,
-  Calendar,
-  Plus,
-  Trash2,
-  Layers,
-  Sparkles,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Save,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { EmptyNote, PageHeader } from "@/components/dashboard/parts";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Question } from "@/types";
+import { AlertCircle, ArrowLeft, CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
+
+const selectClass =
+  "h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -30,21 +28,11 @@ export default function EditAssignmentPage({ params }: PageProps) {
   const assignmentId = resolvedParams.id;
   const router = useRouter();
 
-  const {
-    user,
-    students,
-    subjects,
-    assignments,
-    whiteboards,
-    updateAssignment,
-    saveWhiteboard,
-    updateWhiteboardElements,
-  } = useLMS();
+  const { students, subjects, assignments, whiteboards, updateAssignment, updateWhiteboardElements } = useLMS();
 
   const assignment = assignments.find((a) => a.id === assignmentId);
   const existingBoard = whiteboards.find((w) => w.id === assignment?.whiteboardId);
 
-  const [kind, setKind] = useState<"ASSIGNMENT" | "HOMEWORK">("ASSIGNMENT");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
@@ -58,7 +46,6 @@ export default function EditAssignmentPage({ params }: PageProps) {
   const [saveError, setSaveError] = useState("");
   const [isSaved, setIsSaved] = useState(false);
 
-  // Initialize form state when assignment loads
   useEffect(() => {
     if (assignment) {
       setTitle(assignment.title);
@@ -76,9 +63,7 @@ export default function EditAssignmentPage({ params }: PageProps) {
   if (!assignment) {
     return (
       <AppShell>
-        <div className="py-20 text-center text-slate-500">
-          Assignment or Homework not found.
-        </div>
+        <EmptyNote>Assignment or homework not found.</EmptyNote>
       </AppShell>
     );
   }
@@ -107,7 +92,7 @@ export default function EditAssignmentPage({ params }: PageProps) {
     setQuestions(renumbered);
   };
 
-  const handleQuestionChange = (id: string, field: keyof Question, val: any) => {
+  const handleQuestionChange = <K extends keyof Question>(id: string, field: K, val: Question[K]) => {
     setQuestions(
       questions.map((q) => (q.id === id ? { ...q, [field]: val } : q))
     );
@@ -120,13 +105,12 @@ export default function EditAssignmentPage({ params }: PageProps) {
     }
 
     if (questions.some((q) => !q.text.trim())) {
-      setSaveError("Please complete the text for all questions/tasks.");
+      setSaveError("Please complete the text for all questions.");
       return;
     }
 
     setSaveError("");
 
-    // Update assignment details
     updateAssignment(assignmentId, {
       title: title.trim(),
       subject,
@@ -147,255 +131,197 @@ export default function EditAssignmentPage({ params }: PageProps) {
 
   return (
     <AppShell
-      headerTitle="Edit Assignment & Homework Tasks"
-      headerSubtitle="Modify tasks, instructions, due dates, and whiteboard templates post-submission"
+      headerTitle="Edit assignment"
+      headerSubtitle="Change questions, instructions, due date and the question board"
     >
-      <div className="max-w-5xl mx-auto space-y-6 pb-20">
-        {/* Navigation & Header Actions */}
-        <div className="flex items-center justify-between gap-4">
-          <button
-            onClick={() => router.push("/teacher/assignments")}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Assignments</span>
-          </button>
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 pb-20">
+        <PageHeader
+          title={assignment.title}
+          description={`${students.length ? `${selectedStudentIds.length} assigned` : "No students yet"} · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`}
+          action={
+            <Button variant="ghost" onClick={() => router.push("/teacher/assignments")}>
+              <ArrowLeft data-icon="inline-start" />
+              Back to assignments
+            </Button>
+          }
+        />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("details")}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-xl transition-all",
-                activeTab === "details"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-              )}
-            >
-              Task Details & Questions
-            </button>
-            <button
-              onClick={() => setActiveTab("whiteboard")}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5",
-                activeTab === "whiteboard"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-              )}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Questions Whiteboard Canvas</span>
-            </button>
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "details" | "whiteboard")}>
+          <TabsList>
+            <TabsTrigger value="details">Details and questions</TabsTrigger>
+            <TabsTrigger value="whiteboard">Question board</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {saveError && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs font-semibold">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{saveError}</span>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription>{saveError}</AlertDescription>
+          </Alert>
         )}
 
         {isSaved && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Homework and tasks updated successfully! Redirecting...</span>
-          </div>
+          <Alert>
+            <CheckCircle2 />
+            <AlertDescription>Changes saved. Going back to assignments.</AlertDescription>
+          </Alert>
         )}
 
         {activeTab === "details" ? (
-          <div className="space-y-6">
-            {/* Card 1: Core Metadata */}
-            <div className="p-6 md:p-8 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-6">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                1. Basic Info & Due Date
-              </h3>
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Basics</CardTitle>
+                <CardDescription>Title, subject, due date and instructions.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FieldGroup>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="asg-title">Title</FieldLabel>
+                      <Input
+                        id="asg-title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="e.g. Quadratic equations practice"
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="asg-subject">Subject</FieldLabel>
+                      <select id="asg-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={selectClass}>
+                        {subjects.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Assignment / Homework Title
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Calculus Roots & Integration Drill"
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="asg-due">Due date</FieldLabel>
+                      <Input id="asg-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="asg-difficulty">Difficulty</FieldLabel>
+                      <select
+                        id="asg-difficulty"
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value as "Easy" | "Medium" | "Hard")}
+                        className={selectClass}
+                      >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                      </select>
+                    </Field>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Subject
-                  </label>
-                  <select
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                  <Field>
+                    <FieldLabel htmlFor="asg-instructions">Instructions</FieldLabel>
+                    <Textarea
+                      id="asg-instructions"
+                      rows={3}
+                      value={instructions}
+                      onChange={(e) => setInstructions(e.target.value)}
+                      placeholder="Show your working on the whiteboard."
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="asg-description">Overview</FieldLabel>
+                    <Textarea
+                      id="asg-description"
+                      rows={2}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </Field>
+                </FieldGroup>
+              </CardContent>
+            </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Difficulty Level
-                  </label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value as any)}
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  General Instructions & Guidance
-                </label>
-                <textarea
-                  rows={3}
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="Show working steps on the whiteboard canvas..."
-                  className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            {/* Card 2: Question / Task Builder */}
-            <div className="p-6 md:p-8 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    2. Tasks & Problems ({questions.length})
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Add or edit individual tasks and awarded marks for this assignment.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleAddQuestion}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Problem Task</span>
-                </button>
-              </div>
-
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Questions ({questions.length})</CardTitle>
+                <CardDescription>Edit the prompts and the marks each one is worth.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
                 {questions.map((q) => (
-                  <div
-                    key={q.id}
-                    className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 relative"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-indigo-700">
-                        Task #{q.number}
-                      </span>
+                  <div key={q.id} className="flex flex-col gap-3 rounded-xl border bg-background p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-foreground">Question {q.number}</span>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-slate-600">
-                          Marks:
+                        <label htmlFor={`marks-${q.id}`} className="text-xs text-muted-foreground">
+                          Marks
                         </label>
-                        <input
+                        <Input
+                          id={`marks-${q.id}`}
                           type="number"
                           value={q.maxScore}
-                          onChange={(e) =>
-                            handleQuestionChange(
-                              q.id,
-                              "maxScore",
-                              parseInt(e.target.value, 10) || 1
-                            )
-                          }
-                          className="w-16 px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg text-center"
+                          onChange={(e) => handleQuestionChange(q.id, "maxScore", parseInt(e.target.value, 10) || 1)}
+                          className="h-8 w-16 text-center"
                         />
                         {questions.length > 1 && (
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() => handleRemoveQuestion(q.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                            aria-label={`Remove question ${q.number}`}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <Trash2 />
+                          </Button>
                         )}
                       </div>
                     </div>
-
-                    <textarea
+                    <Textarea
                       rows={2}
                       value={q.text}
                       onChange={(e) => handleQuestionChange(q.id, "text", e.target.value)}
-                      placeholder="Enter the task prompt or question statement..."
-                      className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Type the question"
+                      aria-label={`Question ${q.number} text`}
                     />
                   </div>
                 ))}
-              </div>
-            </div>
+                <Button variant="outline" className="self-start" onClick={handleAddQuestion}>
+                  <Plus data-icon="inline-start" />
+                  Add question
+                </Button>
+              </CardContent>
+            </Card>
 
-            {/* Save Action */}
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => router.push("/teacher/assignments")}
-                className="px-5 py-2.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              >
+              <Button variant="outline" onClick={() => router.push("/teacher/assignments")}>
                 Cancel
-              </button>
-              <button
-                onClick={handleSaveAssignment}
-                className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Assignment & Homework Updates</span>
-              </button>
+              </Button>
+              <Button onClick={handleSaveAssignment}>
+                <Save data-icon="inline-start" />
+                Save changes
+              </Button>
             </div>
           </div>
         ) : (
-          /* Whiteboard Tab */
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-600 px-2">
-              <span className="font-semibold">
-                Question Board Template: <strong>{existingBoard?.title || assignment.title}</strong>
-              </span>
-              <span>Use Pen, Images, Shapes & Text to draw question diagrams</span>
-            </div>
-
-            <div className="h-[600px] w-full relative">
-              <WhiteboardCanvas
-                initialWhiteboard={existingBoard}
-                whiteboardId={existingBoard?.id}
-                roleLabel="Teacher"
-                showTeacherTools={true}
-                onSave={(newElements, previousElements) => {
-                  if (existingBoard) {
-                    updateWhiteboardElements(existingBoard.id, newElements, previousElements);
-                  }
-                }}
-              />
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{existingBoard?.title || assignment.title}</CardTitle>
+              <CardDescription>Draw diagrams or add images with the pen, shape and text tools.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="relative h-[600px] w-full overflow-hidden rounded-xl border">
+                <WhiteboardCanvas
+                  initialWhiteboard={existingBoard}
+                  whiteboardId={existingBoard?.id}
+                  roleLabel="Teacher"
+                  showTeacherTools={true}
+                  onSave={(newElements, previousElements) => {
+                    if (existingBoard) {
+                      updateWhiteboardElements(existingBoard.id, newElements, previousElements);
+                    }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </AppShell>

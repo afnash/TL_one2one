@@ -1,5 +1,5 @@
 import { StudyMaterial } from "@/types";
-import { supabaseConfigured, supabaseRequest } from "./supabase";
+import { apiRequest, supabaseConfigured } from "./supabase";
 
 export interface MaterialMatch {
   material: StudyMaterial;
@@ -56,7 +56,7 @@ export async function searchStudyMaterials(
   let rpcResults: StudyMaterial[] = [];
   if (supabaseConfigured) {
     try {
-      const data = await supabaseRequest<StudyMaterial[]>("/rest/v1/rpc/search_materials", {
+      const data = await apiRequest<StudyMaterial[]>("/api/rpc/search_materials", {
         method: "POST",
         body: JSON.stringify({ p_query: trimmed }),
       });

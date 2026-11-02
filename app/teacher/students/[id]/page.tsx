@@ -1,7 +1,89 @@
 "use client";
+
 import { use } from "react";
 import Link from "next/link";
 import { useLMS } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
+import { EmptyNote, ListRow, PageHeader, RowList, Section } from "@/components/dashboard/parts";
 import { SubjectProgress } from "@/components/SubjectProgress";
-export default function Student({params}:{params:Promise<{id:string}>}){const {id}=use(params);const {students,sessions,submissions,sessionReports}=useLMS();const student=students.find(s=>s.id===id);if(!student)return <AppShell>Student not found.</AppShell>;return <AppShell><div className="max-w-5xl mx-auto space-y-5"><h1 className="text-2xl font-bold">{student.name}</h1><p>{student.email} ? {student.grade} ? {student.subjects.join(", ")}</p><div className="flex flex-wrap gap-3"><Link href="/teacher/sessions" className="bg-indigo-600 text-white rounded-lg p-3">Schedule class</Link><Link href="/teacher/assignments/new" className="border rounded-lg p-3">Assign work</Link><Link href="/teacher/students" className="border rounded-lg p-3">Edit profile / roster</Link></div><section className="bg-white border rounded-2xl p-6 space-y-4"><h2 className="font-bold">Graded progress</h2><SubjectProgress studentId={id}/></section><section className="bg-white border rounded-2xl p-6 space-y-3"><h2 className="font-bold">Classes</h2>{sessions.filter(s=>s.studentId===id||s.studentIds?.includes(id)).map(s=><p key={s.id}>{s.date} ? {s.topic} ? {s.status}</p>)}</section><section className="bg-white border rounded-2xl p-6 space-y-3"><h2 className="font-bold">Submitted work</h2>{submissions.filter(s=>s.studentId===id).map(s=><Link className="block text-indigo-600" key={s.id} href={"/teacher/assignments/"+s.assignmentId+"/mark/"+id}>{s.assignmentTitle} ? {s.status} ? {s.score??"?"}/{s.maxScore}</Link>)}</section><section className="bg-white border rounded-2xl p-6"><h2 className="font-bold">Session remarks</h2>{sessionReports.filter(r=>r.studentId===id).map(r=><p className="mt-3" key={r.id}>{r.date}: {r.studentPerformanceNotes}</p>)}</section></div></AppShell>;}
+import { Button } from "@/components/ui/button";
+
+export default function Student({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { students, sessions, submissions, sessionReports } = useLMS();
+  const student = students.find((s) => s.id === id);
+  if (!student) {
+    return (
+      <AppShell headerTitle="Student">
+        <EmptyNote>Student not found.</EmptyNote>
+      </AppShell>
+    );
+  }
+  const lessons = sessions.filter((s) => s.studentId === id || s.studentIds?.includes(id));
+  const work = submissions.filter((s) => s.studentId === id);
+  const remarks = sessionReports.filter((r) => r.studentId === id);
+  return (
+    <AppShell headerTitle="Student">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 pb-16">
+        <PageHeader
+          title={student.name}
+          description={[student.email, student.grade, student.subjects.join(", ")].filter(Boolean).join(" · ")}
+          action={
+            <Button asChild>
+              <Link href="/teacher/sessions">Schedule a lesson</Link>
+            </Button>
+          }
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/teacher/assignments/new">Assign work</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/teacher/students">Edit profile</Link>
+          </Button>
+        </div>
+        <Section title="Graded progress">
+          <SubjectProgress studentId={id} />
+        </Section>
+        <Section title="Lessons">
+          {lessons.length ? (
+            <RowList>
+              {lessons.map((s) => (
+                <ListRow key={s.id} title={s.topic || "Lesson"} meta={`${s.date} · ${s.status.toLowerCase()}`} />
+              ))}
+            </RowList>
+          ) : (
+            <EmptyNote>No lessons yet.</EmptyNote>
+          )}
+        </Section>
+        <Section title="Submitted work">
+          {work.length ? (
+            <RowList>
+              {work.map((s) => (
+                <ListRow
+                  key={s.id}
+                  title={s.assignmentTitle}
+                  meta={`${s.status.toLowerCase()} · ${s.score ?? "–"}/${s.maxScore}`}
+                  href={`/teacher/assignments/${s.assignmentId}/mark/${id}`}
+                />
+              ))}
+            </RowList>
+          ) : (
+            <EmptyNote>No submissions yet.</EmptyNote>
+          )}
+        </Section>
+        <Section title="Lesson remarks">
+          {remarks.length ? (
+            <RowList>
+              {remarks.map((r) => (
+                <ListRow key={r.id} title={r.date} meta={r.studentPerformanceNotes} />
+              ))}
+            </RowList>
+          ) : (
+            <EmptyNote>No remarks yet.</EmptyNote>
+          )}
+        </Section>
+      </div>
+    </AppShell>
+  );
+}

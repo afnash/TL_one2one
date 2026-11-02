@@ -5,15 +5,9 @@ import { RosterManager } from "@/components/RosterManager";
 
 export default function ManagerTeachersPage() {
   return (
-    <AppShell headerTitle="Department Faculty" headerSubtitle="Add and manage teachers assigned to your department">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Faculty Team</h1>
-          <p className="text-xs text-slate-500">
-            View, add, and manage teacher profiles and assign them to curriculum disciplines.
-          </p>
-        </div>
-        <RosterManager kind="TEACHER" />
+    <AppShell headerTitle="Teachers">
+      <div className="mx-auto max-w-6xl pb-12">
+        <RosterManager kind="TEACHER" title="Teachers" description="Teachers in your department." />
       </div>
     </AppShell>
   );

@@ -102,6 +102,7 @@ export function WhiteboardCanvas({
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const hTrackRef = useRef<HTMLDivElement | null>(null);
   const vTrackRef = useRef<HTMLDivElement | null>(null);
@@ -594,7 +595,7 @@ function getResizeHandleAtCoords(
           ctx.strokeStyle = "#e2e8f0";
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.roundRect ? ctx.roundRect(el.x, el.y, qw, qh, 8) : ctx.rect(el.x, el.y, qw, qh);
+          if (ctx.roundRect) ctx.roundRect(el.x, el.y, qw, qh, 8); else ctx.rect(el.x, el.y, qw, qh);
           ctx.fill();
           ctx.stroke();
 
@@ -685,6 +686,7 @@ function getResizeHandleAtCoords(
     const container = containerRef.current;
     if (!container) return;
     const ro = new ResizeObserver(() => {
+      setContainerWidth(container.clientWidth || 800);
       redrawCanvas();
     });
     ro.observe(container);
@@ -1163,31 +1165,33 @@ function getResizeHandleAtCoords(
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     const imgData = canvas.toDataURL("image/png");
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${initialWhiteboard?.title || "Whiteboard Export"}</title>
-          <style>
-            body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; background: #f8fafc; }
-            .header { width: 100%; max-width: 900px; padding: 24px; display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; }
-            img { max-width: 95%; height: auto; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: white; border-radius: 8px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h2 style="margin:0;color:#1e293b;">${initialWhiteboard?.title || "1-to-1 Learning Whiteboard"}</h2>
-              <p style="margin:4px 0 0 0;color:#64748b;font-size:13px;">Subject: ${initialWhiteboard?.subject || "General"} | Student: ${initialWhiteboard?.studentName || "Class"}</p>
-            </div>
-            <div style="text-align:right;color:#64748b;font-size:12px;">
-              Generated: ${new Date().toLocaleDateString()}
-            </div>
-          </div>
-          <img src="${imgData}" onload="window.print();" />
-        </body>
-      </html>
+    // Built with DOM APIs and textContent so board titles and names cannot inject markup.
+    const doc = printWindow.document;
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, style?: string) => {
+      const node = doc.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (style) node.setAttribute("style", style);
+      return node;
+    };
+    doc.title = initialWhiteboard?.title || "Whiteboard Export";
+    const css = el("style", `
+      body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; background: #f8fafc; }
+      .header { width: 100%; max-width: 900px; padding: 24px; display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; }
+      img { max-width: 95%; height: auto; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: white; border-radius: 8px; }
     `);
-    printWindow.document.close();
+    doc.head.appendChild(css);
+    const header = el("div");
+    header.className = "header";
+    const info = el("div");
+    info.append(
+      el("h2", initialWhiteboard?.title || "1-to-1 Learning Whiteboard", "margin:0;color:#1e293b;"),
+      el("p", `Subject: ${initialWhiteboard?.subject || "General"} | Student: ${initialWhiteboard?.studentName || "Class"}`, "margin:4px 0 0 0;color:#64748b;font-size:13px;"),
+    );
+    header.append(info, el("div", `Generated: ${new Date().toLocaleDateString()}`, "text-align:right;color:#64748b;font-size:12px;"));
+    const img = el("img");
+    img.onload = () => printWindow.print();
+    img.src = imgData;
+    doc.body.append(header, img);
   };
 
   const isShapeTool = ["rectangle", "circle", "line", "arrow"].includes(activeTool);
@@ -1305,7 +1309,7 @@ function getResizeHandleAtCoords(
     <div
       ref={containerRef}
       className={cn(
-        "relative isolate h-full min-h-0 w-full flex flex-col overflow-hidden overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xs select-none fullscreen:rounded-none fullscreen:border-0",
+        "relative isolate h-full min-h-0 w-full flex flex-col overflow-hidden overscroll-contain rounded-xl border border-border bg-white select-none fullscreen:rounded-none fullscreen:border-0",
         className
       )}
     >
@@ -1313,15 +1317,15 @@ function getResizeHandleAtCoords(
       <div ref={toolbarRef} className="pointer-events-none absolute inset-x-2 top-2 z-30 flex items-start justify-between gap-2">
         {/* Compact Drawing Toolbar */}
         {!readOnly && (
-          <div className="pointer-events-auto flex flex-wrap items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-sm backdrop-blur-md text-slate-700">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-0.5 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur-md text-foreground">
             {/* Select & Move */}
             <button
               title="Select & Move (V)"
               aria-label="Select & Move"
               onClick={() => { setActiveTool("select"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "select" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "select" && "bg-secondary text-primary font-semibold"
               )}
             >
               <MousePointer className="w-3.5 h-3.5" />
@@ -1333,14 +1337,14 @@ function getResizeHandleAtCoords(
               aria-label="Pan Canvas"
               onClick={() => { setActiveTool("pan"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "pan" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "pan" && "bg-secondary text-primary font-semibold"
               )}
             >
               <Hand className="w-3.5 h-3.5" />
             </button>
 
-            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+            <div className="w-[1px] h-4 bg-border mx-0.5" />
 
             {/* Pen Tool */}
             <button
@@ -1348,8 +1352,8 @@ function getResizeHandleAtCoords(
               aria-label="Pen"
               onClick={() => { setActiveTool("pen"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "pen" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "pen" && "bg-secondary text-primary font-semibold"
               )}
             >
               <Pencil className="w-3.5 h-3.5" />
@@ -1361,8 +1365,8 @@ function getResizeHandleAtCoords(
               aria-label="Highlighter"
               onClick={() => { setActiveTool("highlighter"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "highlighter" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "highlighter" && "bg-secondary text-primary font-semibold"
               )}
             >
               <Highlighter className="w-3.5 h-3.5" />
@@ -1374,14 +1378,14 @@ function getResizeHandleAtCoords(
               aria-label="Eraser"
               onClick={() => { setActiveTool("eraser"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "eraser" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "eraser" && "bg-secondary text-primary font-semibold"
               )}
             >
               <Eraser className="w-3.5 h-3.5" />
             </button>
 
-            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+            <div className="w-[1px] h-4 bg-border mx-0.5" />
 
             {/* Shapes Dropdown */}
             <div className="relative">
@@ -1390,54 +1394,54 @@ function getResizeHandleAtCoords(
                 aria-label="Shapes"
                 onClick={() => setOpenMenu(openMenu === "shape" ? null : "shape")}
                 className={cn(
-                  "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-slate-100",
-                  isShapeTool && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                  "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-muted",
+                  isShapeTool && "bg-secondary text-primary font-semibold"
                 )}
               >
                 {getShapeIcon()}
-                <span className="text-[9px] text-slate-400">▼</span>
+                <span className="text-[9px] text-muted-foreground">▼</span>
               </button>
 
               {openMenu === "shape" && (
-                <div className="absolute top-full left-0 mt-1 flex flex-col gap-0.5 p-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95 min-w-[130px]">
+                <div className="absolute top-full left-0 mt-1 flex flex-col gap-0.5 p-1 bg-popover border border-border rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95 min-w-[130px]">
                   <button
                     onClick={() => { setActiveTool("rectangle"); setOpenMenu(null); }}
                     className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
-                      activeTool === "rectangle" && "bg-indigo-50 text-indigo-700 font-semibold"
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-muted transition-colors text-foreground",
+                      activeTool === "rectangle" && "bg-secondary text-primary font-semibold"
                     )}
                   >
-                    <Square className="w-3.5 h-3.5 text-indigo-600" />
+                    <Square className="w-3.5 h-3.5 text-primary" />
                     <span>Rectangle</span>
                   </button>
                   <button
                     onClick={() => { setActiveTool("circle"); setOpenMenu(null); }}
                     className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
-                      activeTool === "circle" && "bg-indigo-50 text-indigo-700 font-semibold"
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-muted transition-colors text-foreground",
+                      activeTool === "circle" && "bg-secondary text-primary font-semibold"
                     )}
                   >
-                    <CircleIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    <CircleIcon className="w-3.5 h-3.5 text-primary" />
                     <span>Circle</span>
                   </button>
                   <button
                     onClick={() => { setActiveTool("line"); setOpenMenu(null); }}
                     className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
-                      activeTool === "line" && "bg-indigo-50 text-indigo-700 font-semibold"
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-muted transition-colors text-foreground",
+                      activeTool === "line" && "bg-secondary text-primary font-semibold"
                     )}
                   >
-                    <Minus className="w-3.5 h-3.5 text-indigo-600" />
+                    <Minus className="w-3.5 h-3.5 text-primary" />
                     <span>Straight Line</span>
                   </button>
                   <button
                     onClick={() => { setActiveTool("arrow"); setOpenMenu(null); }}
                     className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-slate-50 transition-colors text-slate-700",
-                      activeTool === "arrow" && "bg-indigo-50 text-indigo-700 font-semibold"
+                      "flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg hover:bg-muted transition-colors text-foreground",
+                      activeTool === "arrow" && "bg-secondary text-primary font-semibold"
                     )}
                   >
-                    <MoveRight className="w-3.5 h-3.5 text-indigo-600" />
+                    <MoveRight className="w-3.5 h-3.5 text-primary" />
                     <span>Arrow</span>
                   </button>
                 </div>
@@ -1450,8 +1454,8 @@ function getResizeHandleAtCoords(
               aria-label="Text Box"
               onClick={() => { setActiveTool("text"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "text" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "text" && "bg-secondary text-primary font-semibold"
               )}
             >
               <Type className="w-3.5 h-3.5" />
@@ -1463,8 +1467,8 @@ function getResizeHandleAtCoords(
               aria-label="Sticky Note"
               onClick={() => { setActiveTool("sticky"); setOpenMenu(null); }}
               className={cn(
-                "p-1.5 rounded-lg transition-colors hover:bg-slate-100",
-                activeTool === "sticky" && "bg-indigo-50 text-indigo-600 font-semibold shadow-2xs"
+                "p-1.5 rounded-lg transition-colors hover:bg-muted",
+                activeTool === "sticky" && "bg-secondary text-primary font-semibold"
               )}
             >
               <StickyNote className="w-3.5 h-3.5" />
@@ -1475,7 +1479,7 @@ function getResizeHandleAtCoords(
               title="Upload Image (or Ctrl+V to paste)"
               aria-label="Upload Image"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg transition-colors hover:bg-slate-100 text-slate-700 hover:text-indigo-600"
+              className="p-1.5 rounded-lg transition-colors hover:bg-muted text-foreground hover:text-primary"
             >
               <ImageIcon className="w-3.5 h-3.5" />
             </button>
@@ -1496,16 +1500,16 @@ function getResizeHandleAtCoords(
                   aria-label="Teacher Stamps"
                   onClick={() => setOpenMenu(openMenu === "stamp" ? null : "stamp")}
                   className={cn(
-                    "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-slate-100",
-                    activeTool === "stamp" && "bg-amber-50 text-amber-600 font-semibold shadow-2xs"
+                    "p-1.5 rounded-lg transition-colors flex items-center gap-0.5 hover:bg-muted",
+                    activeTool === "stamp" && "bg-amber-50 text-amber-600 font-semibold"
                   )}
                 >
                   {getStampIcon()}
-                  <span className="text-[9px] text-slate-400">▼</span>
+                  <span className="text-[9px] text-muted-foreground">▼</span>
                 </button>
 
                 {openMenu === "stamp" && (
-                  <div className="absolute top-full left-0 mt-1 flex items-center gap-1 p-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95">
+                  <div className="absolute top-full left-0 mt-1 flex items-center gap-1 p-1.5 bg-popover border border-border rounded-xl shadow-lg z-50 animate-in fade-in zoom-in-95">
                     <button
                       title="Correct Mark Stamp (✓)"
                       onClick={() => {
@@ -1567,7 +1571,7 @@ function getResizeHandleAtCoords(
               </div>
             )}
 
-            <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+            <div className="w-[1px] h-4 bg-border mx-0.5" />
 
             {/* Stroke Style & Color Popover */}
             <div className="relative">
@@ -1575,28 +1579,28 @@ function getResizeHandleAtCoords(
                 title="Color & Stroke Width"
                 aria-label="Color and Stroke Width"
                 onClick={() => setOpenMenu(openMenu === "style" ? null : "style")}
-                className="p-1 rounded-lg transition-colors flex items-center gap-1 hover:bg-slate-100 border border-slate-200"
+                className="p-1 rounded-lg transition-colors flex items-center gap-1 hover:bg-muted border border-border"
               >
                 <div
-                  className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs"
+                  className="w-3.5 h-3.5 rounded-full border border-input"
                   style={{ backgroundColor: activeColor }}
                 />
-                <span className="text-[10px] font-bold text-slate-600">{activeStrokeWidth}px</span>
-                <span className="text-[9px] text-slate-400">▼</span>
+                <span className="text-[10px] font-bold text-muted-foreground">{activeStrokeWidth}px</span>
+                <span className="text-[9px] text-muted-foreground">▼</span>
               </button>
 
               {openMenu === "style" && (
-                <div className="absolute top-full left-0 mt-1 p-2.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-52 space-y-2.5">
+                <div className="absolute top-full left-0 mt-1 p-2.5 bg-popover border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-52 space-y-2.5">
                   <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1.5">Color Palette</div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Color Palette</div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {COLOR_PALETTE.map((c) => (
                         <button
                           key={c}
                           onClick={() => { setActiveColor(c); }}
                           className={cn(
-                            "w-5 h-5 rounded-full transition-transform border border-slate-300",
-                            activeColor === c ? "scale-115 ring-2 ring-indigo-500 ring-offset-1" : "hover:scale-110"
+                            "w-5 h-5 rounded-full transition-transform border border-input",
+                            activeColor === c ? "scale-115 ring-2 ring-ring ring-offset-1" : "hover:scale-110"
                           )}
                           style={{ backgroundColor: c }}
                         />
@@ -1604,16 +1608,16 @@ function getResizeHandleAtCoords(
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-100 pt-2">
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1.5">Stroke Thickness</div>
+                  <div className="border-t border-border pt-2">
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Stroke Thickness</div>
                     <div className="grid grid-cols-4 gap-1">
                       {STROKE_WIDTHS.map((sw) => (
                         <button
                           key={sw}
                           onClick={() => { setActiveStrokeWidth(sw); }}
                           className={cn(
-                            "py-1 text-center text-xs font-semibold rounded-md border border-slate-200 hover:bg-slate-50 transition-colors",
-                            activeStrokeWidth === sw ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold" : "text-slate-600"
+                            "py-1 text-center text-xs font-semibold rounded-md border border-border hover:bg-muted transition-colors",
+                            activeStrokeWidth === sw ? "bg-secondary border-ring text-primary font-bold" : "text-muted-foreground"
                           )}
                         >
                           {sw}px
@@ -1628,7 +1632,7 @@ function getResizeHandleAtCoords(
         )}
 
         {/* Compact Right Action Tools (Undo, Redo, Zoom, Fullscreen, Export Menu) */}
-        <div className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-sm backdrop-blur-md text-slate-700 ml-auto">
+        <div className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur-md text-foreground ml-auto">
           {!readOnly && (
             <>
               <button
@@ -1636,7 +1640,7 @@ function getResizeHandleAtCoords(
                 aria-label="Undo"
                 disabled={historyIndex <= 0}
                 onClick={handleUndo}
-                className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
               >
                 <Undo2 className="w-3.5 h-3.5" />
               </button>
@@ -1645,11 +1649,11 @@ function getResizeHandleAtCoords(
                 aria-label="Redo"
                 disabled={historyIndex >= history.length - 1}
                 onClick={handleRedo}
-                className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
               >
                 <Redo2 className="w-3.5 h-3.5" />
               </button>
-              <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+              <div className="w-[1px] h-4 bg-border mx-0.5" />
             </>
           )}
 
@@ -1658,18 +1662,18 @@ function getResizeHandleAtCoords(
             title="Zoom Out"
             aria-label="Zoom Out"
             onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
-          <span className="text-[11px] font-semibold text-slate-600 min-w-[32px] text-center">
+          <span className="text-[11px] font-semibold text-muted-foreground min-w-[32px] text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             title="Zoom In"
             aria-label="Zoom In"
             onClick={() => setZoom((z) => Math.min(3, z + 0.1))}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
@@ -1680,7 +1684,7 @@ function getResizeHandleAtCoords(
               setZoom(1);
               setPan({ x: 0, y: 0 });
             }}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -1689,12 +1693,12 @@ function getResizeHandleAtCoords(
             title={isFullscreen ? "Exit fullscreen" : "Open whiteboard fullscreen"}
             aria-label={isFullscreen ? "Exit whiteboard fullscreen" : "Open whiteboard fullscreen"}
             onClick={() => void toggleFullscreen()}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
           >
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
           </button>
 
-          <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+          <div className="w-[1px] h-4 bg-border mx-0.5" />
 
           {/* Export & Clear Actions Menu */}
           <div className="relative">
@@ -1704,33 +1708,33 @@ function getResizeHandleAtCoords(
               onClick={() => setOpenMenu(openMenu === "actions" ? null : "actions")}
               className={cn(
                 "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors",
-                openMenu === "actions" ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100 text-slate-700"
+                openMenu === "actions" ? "bg-secondary text-primary" : "hover:bg-muted text-foreground"
               )}
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export</span>
-              <span className="text-[9px] text-slate-400">▼</span>
+              <span className="text-[9px] text-muted-foreground">▼</span>
             </button>
 
             {openMenu === "actions" && (
-              <div className="absolute top-full right-0 mt-1 p-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-44 space-y-0.5">
+              <div className="absolute top-full right-0 mt-1 p-1 bg-popover border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 w-44 space-y-0.5">
                 <button
                   onClick={handleExportPNG}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-foreground hover:bg-muted rounded-lg transition-colors text-left"
                 >
-                  <Download className="w-3.5 h-3.5 text-indigo-600" />
+                  <Download className="w-3.5 h-3.5 text-primary" />
                   <span>Download PNG Image</span>
                 </button>
                 <button
                   onClick={handleExportPDF}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-foreground hover:bg-muted rounded-lg transition-colors text-left"
                 >
-                  <FileDown className="w-3.5 h-3.5 text-indigo-600" />
+                  <FileDown className="w-3.5 h-3.5 text-primary" />
                   <span>Export Printable PDF</span>
                 </button>
                 {!readOnly && (
                   <>
-                    <div className="border-t border-slate-100 my-1" />
+                    <div className="border-t border-border my-1" />
                     <button
                       onClick={() => { setOpenMenu(null); handleClear(); }}
                       className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-left"
@@ -1749,35 +1753,35 @@ function getResizeHandleAtCoords(
       {/* Floating Image Resize & Actions Toolbar */}
       {selectedElement && selectedElement.type === "image" && !readOnly && (
         <div
-          className="pointer-events-auto absolute z-40 flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/95 px-2.5 py-1.5 shadow-lg backdrop-blur-md text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-150 select-none"
+          className="pointer-events-auto absolute z-40 flex items-center gap-1.5 rounded-xl border border-border bg-card/95 px-2.5 py-1.5 shadow-lg backdrop-blur-md text-xs font-semibold text-foreground animate-in fade-in zoom-in-95 duration-150 select-none"
           style={{
-            left: `${Math.max(120, Math.min((containerRef.current?.clientWidth || 800) - 130, (selectedElement.x + (selectedElement.width || 320) / 2) * zoom + pan.x))}px`,
+            left: `${Math.max(120, Math.min(containerWidth - 130, (selectedElement.x + (selectedElement.width || 320) / 2) * zoom + pan.x))}px`,
             top: `${Math.max(56, (selectedElement.y) * zoom + pan.y - 46)}px`,
             transform: "translateX(-50%)",
           }}
         >
-          <span className="text-[11px] text-slate-500 font-mono pr-1.5 border-r border-slate-200">
+          <span className="text-[11px] text-muted-foreground font-mono pr-1.5 border-r border-border">
             {Math.round(selectedElement.width || 320)} × {Math.round(selectedElement.height || 240)}
           </span>
           <button
             onClick={() => handleScaleImage(selectedElement.id, 0.8)}
-            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1 cursor-pointer"
+            className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer"
             title="Shrink image (-20%)"
             aria-label="Shrink image"
           >
-            <ZoomOut className="w-3.5 h-3.5 text-indigo-600" />
+            <ZoomOut className="w-3.5 h-3.5 text-primary" />
             <span className="text-[11px]">−20%</span>
           </button>
           <button
             onClick={() => handleScaleImage(selectedElement.id, 1.25)}
-            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1 cursor-pointer"
+            className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer"
             title="Enlarge image (+25%)"
             aria-label="Enlarge image"
           >
-            <ZoomIn className="w-3.5 h-3.5 text-indigo-600" />
+            <ZoomIn className="w-3.5 h-3.5 text-primary" />
             <span className="text-[11px]">+25%</span>
           </button>
-          <div className="w-[1px] h-3.5 bg-slate-200 mx-0.5" />
+          <div className="w-[1px] h-3.5 bg-border mx-0.5" />
           <button
             onClick={() => handleDeleteElement(selectedElement.id)}
             className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
@@ -1801,10 +1805,10 @@ function getResizeHandleAtCoords(
       />
 
       {/* --- Normal Standard Horizontal Scroller --- */}
-      <div className="absolute inset-x-0 bottom-0 z-20 flex h-3.5 items-center border-t border-slate-200/90 bg-slate-100/95 backdrop-blur-xs select-none pr-3.5">
+      <div className="absolute inset-x-0 bottom-0 z-20 flex h-3.5 items-center border-t border-border bg-muted/95 backdrop-blur-xs select-none pr-3.5">
         <button
           onClick={() => scrollByDelta(-250, 0)}
-          className="flex h-full w-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          className="flex h-full w-4 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Scroll Left"
           aria-label="Scroll canvas left"
         >
@@ -1816,12 +1820,12 @@ function getResizeHandleAtCoords(
           onPointerDown={handleHTrackPointerDown}
           onPointerMove={handleHTrackPointerMove}
           onPointerUp={handleHTrackPointerUp}
-          className="relative h-full flex-1 cursor-pointer bg-slate-200/50 hover:bg-slate-200/80 transition-colors"
+          className="relative h-full flex-1 cursor-pointer bg-border/50 hover:bg-border transition-colors"
         >
           <div
             className={cn(
-              "absolute top-0.5 h-2.5 rounded-full bg-slate-400 hover:bg-slate-500 active:bg-indigo-600 transition-colors shadow-2xs",
-              isDraggingHScroll && "bg-indigo-600"
+              "absolute top-0.5 h-2.5 rounded-full bg-muted-foreground/50 hover:bg-muted0 active:bg-primary transition-colors",
+              isDraggingHScroll && "bg-primary"
             )}
             style={{
               width: "18%",
@@ -1832,7 +1836,7 @@ function getResizeHandleAtCoords(
 
         <button
           onClick={() => scrollByDelta(250, 0)}
-          className="flex h-full w-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          className="flex h-full w-4 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Scroll Right"
           aria-label="Scroll canvas right"
         >
@@ -1841,10 +1845,10 @@ function getResizeHandleAtCoords(
       </div>
 
       {/* --- Normal Standard Vertical Scroller --- */}
-      <div className="absolute right-0 top-0 bottom-3.5 z-20 flex w-3.5 flex-col items-center border-l border-slate-200/90 bg-slate-100/95 backdrop-blur-xs select-none">
+      <div className="absolute right-0 top-0 bottom-3.5 z-20 flex w-3.5 flex-col items-center border-l border-border bg-muted/95 backdrop-blur-xs select-none">
         <button
           onClick={() => scrollByDelta(0, -250)}
-          className="flex w-full h-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          className="flex w-full h-4 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Scroll Up"
           aria-label="Scroll canvas up"
         >
@@ -1856,12 +1860,12 @@ function getResizeHandleAtCoords(
           onPointerDown={handleVTrackPointerDown}
           onPointerMove={handleVTrackPointerMove}
           onPointerUp={handleVTrackPointerUp}
-          className="relative w-full flex-1 cursor-pointer bg-slate-200/50 hover:bg-slate-200/80 transition-colors"
+          className="relative w-full flex-1 cursor-pointer bg-border/50 hover:bg-border transition-colors"
         >
           <div
             className={cn(
-              "absolute left-0.5 w-2.5 rounded-full bg-slate-400 hover:bg-slate-500 active:bg-indigo-600 transition-colors shadow-2xs",
-              isDraggingVScroll && "bg-indigo-600"
+              "absolute left-0.5 w-2.5 rounded-full bg-muted-foreground/50 hover:bg-muted0 active:bg-primary transition-colors",
+              isDraggingVScroll && "bg-primary"
             )}
             style={{
               height: "18%",
@@ -1872,7 +1876,7 @@ function getResizeHandleAtCoords(
 
         <button
           onClick={() => scrollByDelta(0, 250)}
-          className="flex w-full h-4 items-center justify-center hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors shrink-0"
+          className="flex w-full h-4 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Scroll Down"
           aria-label="Scroll canvas down"
         >
@@ -1883,7 +1887,7 @@ function getResizeHandleAtCoords(
       {/* Inline Text Editor Popup */}
       {textInput.visible && (
         <div
-          className="absolute z-30 p-2 bg-white border border-slate-300 rounded-lg shadow-lg"
+          className="absolute z-30 p-2 bg-popover border border-input rounded-lg shadow-lg"
           style={{
             left: `${textInput.x * zoom + pan.x}px`,
             top: `${textInput.y * zoom + pan.y}px`,
@@ -1903,18 +1907,18 @@ function getResizeHandleAtCoords(
               }
             }}
             placeholder="Type your notes or mathematical expressions..."
-            className="w-64 p-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
+            className="w-64 p-2 text-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
           />
           <div className="flex justify-end gap-1 mt-1">
             <button
               onClick={() => setTextInput({ visible: false, x: 0, y: 0, text: "" })}
-              className="px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 rounded"
+              className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded"
             >
               Cancel
             </button>
             <button
               onClick={handleTextSubmit}
-              className="px-2.5 py-1 text-xs font-semibold bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              className="px-2.5 py-1 text-xs font-semibold bg-primary text-white rounded hover:bg-primary/90"
             >
               Place Text
             </button>
@@ -1923,15 +1927,15 @@ function getResizeHandleAtCoords(
       )}
 
       {/* Bottom Status & Info Bar (Clean floating badge above the bottom scrollbar) */}
-      <div className="absolute bottom-5 left-2.5 z-10 flex items-center gap-2 px-2.5 py-1 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-lg text-[11px] text-slate-500 shadow-2xs">
-        <div className="flex items-center gap-1.5 font-medium text-slate-700">
+      <div className="absolute bottom-5 left-2.5 z-10 flex items-center gap-2 px-2.5 py-1 bg-card/90 backdrop-blur-xs border border-border rounded-lg text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 font-medium text-foreground">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className="max-w-[140px] sm:max-w-[200px] truncate">{initialWhiteboard?.title || "Collaborative Canvas"}</span>
         </div>
-        <span className="text-slate-300">|</span>
+        <span className="text-border">|</span>
         <span className="hidden sm:inline">{elements.length} items</span>
-        <span className="hidden sm:inline text-slate-300">|</span>
-        <span className="flex items-center gap-1 text-indigo-600 font-medium">
+        <span className="hidden sm:inline text-border">|</span>
+        <span className="flex min-w-[4.5rem] items-center gap-1 text-primary font-medium">
           <Sparkles className="w-2.5 h-2.5" /> {connectionError ? "Not saved" : saving ? "Saving…" : "Synced"}
         </span>
       </div>

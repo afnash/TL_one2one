@@ -1,14 +1,14 @@
-# OneToOne LMS
+# sofiaa
 
-Student and teacher workspaces backed by the Supabase Data and Storage APIs, with temporary password-free profile selection.
+Student and teacher workspaces backed by the Supabase Data and Storage APIs, with password sign-in and signed session cookies.
 
 ## Setup
 
-1. Open your Supabase project's SQL Editor, paste all of [dumb.sql](./dumb.sql), and Run. The script is transactional and can be re-run without deleting existing rows. It creates no sample users, sessions, assignments, or notes.
-2. Set the values shown in [.env.example](./.env.example) in .env.local. The supplied project URL and publishable key are already configured locally. Keep ADMIN_SESSION_SECRET server-only; the local file contains a generated random value.
+1. Open your Supabase project's SQL Editor, paste all of [supabase/schema.sql](./supabase/schema.sql), and Run. The script is transactional and can be re-run without deleting existing rows. It creates no sample users, sessions, assignments, or notes.
+2. Set the values shown in [.env.example](./.env.example) in .env.local. The supplied project URL and publishable key are already configured locally. Also set the server-only SUPABASE_SECRET_KEY, SESSION_SECRET, ADMIN_USERNAME and ADMIN_PASSWORD. Never give these a NEXT_PUBLIC_ prefix.
 3. Restart with npm run dev (use npm.cmd run dev in PowerShell if script execution is disabled).
-4. Open /manage and sign in with username admin and password admin123. Add teachers and students. Edit a student to assign a teacher and subjects.
-5. Open /login, select Student or Teacher, and choose an existing active profile. The chosen role and login time are written to lms_profiles. Only the selected profile ID/role is stored in localStorage; learning records come from Supabase.
+4. Open /manage and sign in with ADMIN_USERNAME and ADMIN_PASSWORD from .env.local. Give every account a password of 8+ characters (accounts without one cannot sign in). Add teachers and students. Edit a student to assign a teacher and subjects.
+5. Open /login and sign in with the email and password an administrator set for the account. Your role decides which portal opens (student, teacher, manager). The session is an httpOnly signed cookie; nothing about the account is kept in localStorage.
 
 ## Workflows
 
@@ -26,7 +26,13 @@ The lms_* tables store a text primary key, a JSONB data document matching types/
 
 ## Temporary access model
 
-This intentionally uses anonymous read/write RLS policies to support the requested role-only flow. Anyone with the public project key can read or modify the prototype data directly. UI role filters and board-writing controls are not database authorization. The server checks the /manage credentials and signs an HttpOnly admin cookie; this protects all /admin pages but does not secure the public Supabase API. Replace this mode with Supabase Auth and ownership-based RLS before storing confidential student information. The materials bucket is public.
+Security model: the database is locked. Row Level Security is enabled on every table and the public (anon/publishable) key has no access; only the Next.js server reaches the database, using the server-only SUPABASE_SECRET_KEY after verifying the signed HttpOnly session cookie (app/api/*, lib/data-access.ts enforces per-role read/write scope). The materials bucket is public: files are readable by anyone holding their URL.
+
+Operations notes:
+- Keep secrets in `.env.local` (note the leading dot; `env.local` is also git-ignored). Rotate SESSION_SECRET if a file ever sat outside .gitignore or was shared.
+- Legacy plaintext passwords are no longer accepted at sign-in. Run `node --env-file=.env.local scripts/hash-legacy-passwords.mjs` once to hash them (or set `ALLOW_PLAINTEXT_PASSWORDS=true` temporarily, then unset it).
+- Behind a reverse proxy set `TRUSTED_PROXY_HOPS` (e.g. 1) so per-IP rate limits use the real client address; when unset, forwarding headers are ignored and only per-account limits apply. Rate limits and the password-hashing queue (`HASH_CONCURRENCY`, `HASH_QUEUE`) are per process; use a shared store when running several instances.
+- Video signaling messages are authenticated with per-pair keys issued by /api/sessions/[id]/signaling and need a secure context (https or localhost) for WebCrypto. Add a TURN server for restrictive networks.
 
 The publishable key cannot execute DDL; schema creation must be done in the SQL Editor or using a separate privileged database connection. The app follows the [Supabase REST API](https://supabase.com/docs/guides/api) and [API key](https://supabase.com/docs/guides/getting-started/api-keys) conventions.
 
@@ -50,9 +56,9 @@ Verify with two browser profiles: start a CS class, open Live coding in both, ed
 
 The **Conference** sidebar tab is available to teachers and students. A teacher creates a titled conference and shares its 16-character join code. Any signed-in teacher or student with that code can join the group video and view the host's board. Membership in the host's student roster is not required. The host alone gets board editing and End conference controls. Copy the code to share it; leaving keeps the room open, while ending it disconnects embedded video and freezes the board for everyone on their next poll.
 
-**Database setup:** run [supabase/migrations/20260910_conferences.sql](./supabase/migrations/20260910_conferences.sql) once in Supabase's SQL Editor. It is also included in dumb.sql for fresh setups. The migration adds a private conference_rooms table and narrowly scoped create/read/update RPCs. Direct anonymous/authenticated table access is revoked; a join code permits reading a room, while only a separate random host credential can save or end it. Only its SHA-256 hash is stored in the database. Revision checks reject stale writes from a second host tab. Never add this table to the generic lms_patch allowlist or public read/write policies.
+**Database setup:** run [supabase/migrations/20260910_conferences.sql](./supabase/migrations/20260910_conferences.sql) once in Supabase's SQL Editor. It is also included in supabase/schema.sql for fresh setups. The migration adds a private conference_rooms table and narrowly scoped create/read/update RPCs. Direct anonymous/authenticated table access is revoked; a join code permits reading a room, while only a separate random host credential can save or end it. Only its SHA-256 hash is stored in the database. Revision checks reject stale writes from a second host tab. Never add this table to the generic lms_patch allowlist or public read/write policies.
 
-The host credential is retained in this browser's local storage, scoped to the teacher and room. Rejoin from the same browser/profile using the code to regain controls. The prototype still uses password-free LMS profile selection; room creation checks that the selected teacher exists, but it does not authenticate that person's identity. Join codes grant viewing access, so share them only with intended participants.
+The host credential is retained in this browser's local storage, scoped to the teacher and room. Rejoin from the same browser/profile using the code to regain controls. Room creation requires a signed-in teacher session; the host identity comes from the session. Join codes grant viewing access, so share them only with intended participants.
 
 Video uses the [Jitsi iframe API](https://jitsi.github.io/handbook/docs/dev-guide/dev-guide-iframe/). The default meet.jit.si service requires the first participant/host to sign in to create the video meeting; guests can wait for the host and join without a Jitsi account. Set NEXT_PUBLIC_JITSI_DOMAIN to your own Jitsi hostname if desired. Camera and microphone start muted and permissions are handled by Jitsi. Jitsi's moderator rules are separate from the app's host-only whiteboard. Ending the LMS conference closes its embedded calls; independently opened Jitsi windows must be ended using Jitsi controls. Availability and participant capacity depend on the chosen Jitsi service.
 
