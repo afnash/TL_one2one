@@ -124,6 +124,10 @@ revoke all on function public.lms_patch(text,text,jsonb,jsonb) from public, anon
 grant execute on function public.lms_patch(text,text,jsonb,jsonb) to service_role;
 
 -- Conference tables & RPCs
+-- Legacy overloads from an earlier design make PostgREST calls ambiguous (PGRST203).
+drop function if exists public.conference_create(uuid, character varying, text);
+drop function if exists public.conference_read(character varying);
+drop function if exists public.conference_update(character varying, text, integer, character varying, jsonb);
 create table if not exists public.conference_rooms (
   code text primary key,
   host_token_hash bytea not null,
