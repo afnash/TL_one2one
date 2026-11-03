@@ -3,10 +3,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Eraser, Pencil, RotateCcw } from "lucide-react";
+import { Reveal } from "@/components/brand/Reveal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const PEN_COLORS = ["#0c1470", "#17a3a3", "#f5b942", "#e11d48"];
+const PEN_NAMES: Record<string, string> = { "#0c1470": "navy", "#17a3a3": "teal", "#f5b942": "yellow", "#e11d48": "red" };
 
 export function CanvasSandbox() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -35,10 +37,10 @@ export function CanvasSandbox() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     paintBackground(canvas);
-    ctx.font = "600 20px system-ui, sans-serif";
+    ctx.font = "600 20px Outfit, system-ui, sans-serif";
     ctx.fillStyle = "#0c1470";
     ctx.fillText("f(x) = 2x² + 4x + 1", 24, 40);
-    ctx.font = "13px system-ui, sans-serif";
+    ctx.font = "14px \"DM Sans\", system-ui, sans-serif";
     ctx.fillStyle = "#17a3a3";
     ctx.fillText("Vertex (−1, −1)", 24, 66);
 
@@ -79,10 +81,8 @@ export function CanvasSandbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
+  // offsetX/Y are in the canvas's own coordinates, so drawing stays under the pen on the tilted card.
+  const point = (e: React.PointerEvent<HTMLCanvasElement>) => ({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const ctx = e.currentTarget.getContext("2d");
@@ -115,23 +115,24 @@ export function CanvasSandbox() {
 
   return (
     <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-5">
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <Reveal className="flex flex-col gap-4 lg:col-span-2">
         <h2 className="text-3xl font-semibold sm:text-4xl">Try the board</h2>
         <p className="text-white/70">
-          This sandbox runs only in your browser. In a real lesson, teacher and student draw on the same canvas live.
+          Pick a pen and finish the parabola. This sandbox runs only in your browser. In a real lesson, teacher and student draw on the same canvas live.
         </p>
         <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Drawing tools">
           {PEN_COLORS.map((c) => (
             <button
               key={c}
               type="button"
-              aria-label={`Pen colour ${c}`}
+              aria-label={`Pen colour ${PEN_NAMES[c]}`}
+              aria-pressed={!isEraser && penColor === c}
               onClick={() => {
                 setPenColor(c);
                 setIsEraser(false);
               }}
               className={cn(
-                "size-8 rounded-full border-2 border-white/25 transition-transform hover:scale-110 active:scale-95",
+                "size-8 rounded-full border-2 border-white/25 transition-transform duration-150 hover:scale-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
                 !isEraser && penColor === c && "ring-2 ring-white ring-offset-2 ring-offset-navy",
               )}
               style={{ backgroundColor: c }}
@@ -166,8 +167,8 @@ export function CanvasSandbox() {
             Open the full whiteboard
           </Link>
         </Button>
-      </div>
-      <div className="lg:col-span-3">
+      </Reveal>
+      <Reveal delay={80} className="lg:col-span-3">
         <canvas
           ref={canvasRef}
           onPointerDown={startDrawing}
@@ -175,9 +176,9 @@ export function CanvasSandbox() {
           onPointerUp={stopDrawing}
           onPointerLeave={stopDrawing}
           aria-label="Drawing sandbox"
-          className="h-72 w-full touch-none cursor-crosshair rounded-xl bg-white shadow-2xl sm:h-80"
+          className="h-64 w-full touch-none cursor-crosshair rounded-2xl bg-white shadow-2xl sm:h-80"
         />
-      </div>
+      </Reveal>
     </div>
   );
 }
